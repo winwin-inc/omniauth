@@ -15,8 +15,8 @@ return [
             ]
         ],
         'provider' => [
-            'key' => 'LDFmiilYf8Fyw5W10rx4W1KsVrieQCnpBzzpTBWA5vJidQKDx8pMJbmw28R1C4m',
-            "provider" => '/auth'
+            "provider" => '/auth',
+            'key' => 'ahPho9eenaewaqu8oojiehoS3vah3lae'
         ]
     ]
 ];

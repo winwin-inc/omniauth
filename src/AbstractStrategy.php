@@ -75,4 +75,10 @@ abstract class AbstractStrategy implements StrategyInterface
         return $this->responseFactory->createResponse(302)
             ->withHeader('location', $url);
     }
+
+    public function login($identity)
+    {
+        $this->omniauth->setIdentity($identity);
+        return $this->redirect($this->omniauth->getCallbackUrl());
+    }
 }

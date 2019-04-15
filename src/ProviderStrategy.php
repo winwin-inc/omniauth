@@ -28,18 +28,14 @@ class ProviderStrategy extends AbstractStrategy
     {
         $authUrl = $this->options['provider'];
         $authUrl .= (false === strpos($authUrl, '?') ? '?' : '&') . 'redirect_uri='
-            . urlencode($this->request->getUri()->withPath($this->action('callback')));
+            . urlencode($this->buildRedirectUri());
 
-        return $this->responseFactory->createResponse(302)
-            ->withHeader('location', $authUrl);
+        return $this->redirect($authUrl);
     }
 
     public function callback()
     {
-        $this->omniauth->setIdentity($this->getIdentity());
-
-        return $this->responseFactory->createResponse(302)
-            ->withHeader('location', $this->omniauth->getCallbackUrl());
+        return $this->login($this->getIdentity());
     }
 
     public function transport($redirectUrl, array $identity, $error = null)
@@ -59,7 +55,7 @@ class ProviderStrategy extends AbstractStrategy
             return $this->responseFactory->createResponse(302)
                 ->withHeader('location', $redirectUrl . (false === strpos($redirectUrl, '?') ? '?' : '&') . 'auth=' . base64_encode(json_encode($data)));
         } else {
-            $html = '<!doctype html><html><body onload="postit();"><form name="auth" method="post" action="' . $redirectUrl . '">';
+            $html = '<!doctype html><html lang="en"><body onload="postit();"><form name="auth" method="post" action="' . $redirectUrl . '">';
             foreach ($data as $key => $value) {
                 $html .= '<input type="hidden" name="' . $key . '" value="' . htmlspecialchars($value) . '">';
             }
@@ -71,6 +67,17 @@ class ProviderStrategy extends AbstractStrategy
             return $this->responseFactory->createResponse()
                 ->withBody($this->streamFactory->createStream($html));
         }
+    }
+
+    /**
+     * @return \Psr\Http\Message\UriInterface
+     */
+    private function buildRedirectUri()
+    {
+        return $this->request->getUri()->withPath($this->action('callback'))
+            ->withQuery(http_build_query([
+                'redirect_uri' => (string) $this->request->getUri()
+            ]));
     }
 
     private function getIdentity()
@@ -132,7 +139,7 @@ class ProviderStrategy extends AbstractStrategy
             if (!isset($this->options['key'])) {
                 throw new \InvalidArgumentException("provider security key is required");
             }
-            return hash_hmac($signType, $this->getSignContext($data), $this->options['key']);
+            return hash_hmac('sha256', $this->getSignContext($data), $this->options['key']);
         } else {
             openssl_sign($this->getSignContext($data), $sign, $this->getRsaPrivateKey(), OPENSSL_ALGO_SHA256);
             return base64_encode($sign);

@@ -13,22 +13,24 @@ class PasswordStrategy extends AbstractStrategy
     {
         $content = <<<"EOF"
 <!doctype html>
-<html lang="zh-cn">
-<body>
-<form method="post" action="{$this->action('verify')}">
-<div class="row">
-<label for="username">Username: </label>
-<input id="username" name="username" />
-</div>
-<div class="row">
-<label for="password">Password: </label>
-<input type="password" name="password" />
-</div>
-<div class="row">
-<input type="submit" value="Sign In" />
-</div> 
-</form>
-</body>
+<html lang="en">
+  <body>
+    <form method="post" action="{$this->action('verify')}">
+      <div class="row">
+        <label for="username">Username: </label>
+        <input id="username" name="username" />
+      </div>
+      <div class="row">
+        <label for="password">Password: </label>
+        <input type="password" name="password" />
+      </div>
+      <div class="row">
+        <input type="submit" value="Sign In" />
+      </div>
+      <p class="tip">Try username admin and password admin</p>
+    </form>
+    <a href="/auth/provider">Login external</a>
+  </body>
 </html>
 EOF;
         return $this->responseFactory->createResponse()
@@ -45,8 +47,7 @@ EOF;
         if (!password_verify($params['password'], $this->getPasswordHash($params['username']))) {
             return $this->redirect($this->action());
         }
-        $this->omniauth->setIdentity($this->getIdentity($params['username']));
-        return $this->redirect($this->omniauth->getCallbackUrl());
+        return $this->login($this->getIdentity($params['username']));
     }
 
     private function buildUsers()

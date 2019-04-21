@@ -113,7 +113,7 @@ class Omniauth implements MiddlewareInterface
 
     public function setIdentity(array $identity, $strategyName)
     {
-        $identity =  call_user_func($this->configuration['identity_transformer'], $identity, $strategyName);
+        $identity =  call_user_func($this->configuration['identity_transformer'], $identity, $this->getStrategy($strategyName));
         $this->storage->set($this->configuration['auth_key'], $identity);
     }
 

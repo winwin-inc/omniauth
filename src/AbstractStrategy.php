@@ -65,9 +65,14 @@ abstract class AbstractStrategy implements StrategyInterface
         $this->request = $request;
     }
 
-    public function action($name = '')
+    public function action($name = '', $absolute = false)
     {
-        return $this->omniauth->buildUrl($this->name, $name);
+        $url = $this->omniauth->buildUrl($this->name, $name);
+        if ($absolute) {
+            return $this->request->getUri()->withPath($url)->withQuery('');
+        } else {
+            return $url;
+        }
     }
 
     public function redirect($url)
@@ -80,5 +85,37 @@ abstract class AbstractStrategy implements StrategyInterface
     {
         $this->omniauth->setIdentity($identity, $this->name);
         return $this->redirect($this->omniauth->getCallbackUrl());
+    }
+
+    /**
+     * @return string
+     */
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * @return array
+     */
+    public function getOptions(): array
+    {
+        return $this->options;
+    }
+
+    /**
+     * @return Omniauth
+     */
+    public function getOmniauth(): Omniauth
+    {
+        return $this->omniauth;
+    }
+
+    /**
+     * @return ServerRequestInterface
+     */
+    public function getRequest(): ServerRequestInterface
+    {
+        return $this->request;
     }
 }

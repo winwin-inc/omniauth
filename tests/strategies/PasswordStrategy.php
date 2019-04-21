@@ -29,7 +29,8 @@ class PasswordStrategy extends AbstractStrategy
       </div>
       <p class="tip">Try username admin and password admin</p>
     </form>
-    <a href="/auth/provider">Login external</a>
+    <a href="/auth/provider">External Login</a>
+    <a href="/auth/github">Github Login</a>
   </body>
 </html>
 EOF;

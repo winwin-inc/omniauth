@@ -1,6 +1,8 @@
 {
     "name": "winwin/omniauth",
     "type": "project",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "require": {
         "php": "^7.0",
         "ext-json": "*",
@@ -15,7 +17,11 @@
         "phpunit/phpunit": "^6.0",
         "http-interop/http-factory-diactoros": "^1.0",
         "http-interop/http-factory-guzzle": "^1.0",
-        "hybridauth/hybridauth": "^2.14"
+        "hybridauth/hybridauth": "~3.0",
+        "vlucas/phpdotenv": "^3.3"
+    },
+    "suggest": {
+        "hybridauth/hybridauth": "To use oauth2 providers implements in Hybridauth 3"
     },
     "autoload": {
         "psr-4": {

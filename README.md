@@ -46,10 +46,14 @@ The key name to save current page before redirect user to login page in `$_SESSI
 omniauth will redirect user to the saved page.
 The default value is `login_redirect_uri`.
 
+### identity_transformer
+
+A function to transformer user identity before save to session.
+
 ## How to add my authentication strategy?
 
 Check out [PasswordStrategy](tests/strategies/PasswordStrategy.php) to see how to implements an new authentication strategy.
 
-Usually, an strategy should extends [AbstractStrategy](src/AbstractStrategy.php) and have to implementtwo function `request` and `callback`.
-The `request` function interact with user to input their credential
-and the `callback` function will check user's credential and call `$this->login($user)` to set user identity and return back the page before login.
+Usually, a strategy should extends [AbstractStrategy](src/AbstractStrategy.php) and have to implement two function `authentication` and `verify`.
+The `authentication` function initiate the authentication flow,
+and the `verify` function will check user's credential and call `$this->login($user)` to set user identity and return back the page before login.

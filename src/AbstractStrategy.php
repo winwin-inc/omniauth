@@ -78,7 +78,7 @@ abstract class AbstractStrategy implements StrategyInterface
 
     public function login($identity)
     {
-        $this->omniauth->setIdentity($identity);
+        $this->omniauth->setIdentity($identity, $this->name);
         return $this->redirect($this->omniauth->getCallbackUrl());
     }
 }

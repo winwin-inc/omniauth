@@ -20,6 +20,11 @@ class Omniauth implements MiddlewareInterface
     private $configuration;
 
     /**
+     * @var StorageInterface
+     */
+    private $storage;
+
+    /**
      * @var StrategyFactoryInterface
      */
     private $strategyFactory;
@@ -40,7 +45,7 @@ class Omniauth implements MiddlewareInterface
      * @param array $config
      * @param StrategyFactoryInterface|null $strategyFactory
      */
-    public function __construct(array $config, StrategyFactoryInterface $strategyFactory = null)
+    public function __construct(array $config, StorageInterface $storage = null, StrategyFactoryInterface $strategyFactory = null)
     {
         $this->configuration = $config + [
                 'route' => '/:strategy/:action',
@@ -48,10 +53,14 @@ class Omniauth implements MiddlewareInterface
                 'auth_key' => 'auth',
                 'redirect_uri_key' => 'login_redirect_uri',
                 'callback_url' => '/',
+                'identity_transformer' => function(array $identity) {
+                    return $identity;
+                }
             ];
         if (!isset($config['strategies'])) {
             throw new \InvalidArgumentException('strategies is required');
         }
+        $this->storage = $storage ?: new SessionStorage();
         if (!$strategyFactory) {
             $strategyFactory = $this->createDefaultStrategyFactory();
         }
@@ -65,17 +74,11 @@ class Omniauth implements MiddlewareInterface
      */
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if (preg_match($this->getRouteRegex(), $request->getUri()->getPath(), $matches)) {
-            $strategy = $this->getStrategy($matches[1]);
-            if ($strategy) {
-                $action = isset($matches[2]) && '/' != $matches[2] ? substr($matches[2], 1) : 'request';
-                if (method_exists($strategy, $action)) {
-                    $strategy->setRequest($request);
-
-                    return call_user_func([$strategy, $action]);
-                }
-            }
-        } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated()) {
+        $response = $this->authenticate($request);
+        if ($response) {
+            return $response;
+        } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated()
+            && !preg_match($this->getRouteRegex(), $request->getUri()->getPath())) {
             return $this->getResponseFactory()->createResponse(302)
                 ->withHeader("location", $this->getDefaultAuthUrl($request->getUri()));
         }
@@ -83,19 +86,35 @@ class Omniauth implements MiddlewareInterface
         return $handler->handle($request);
     }
 
+    public function authenticate(ServerRequestInterface $request)
+    {
+        if (preg_match($this->getRouteRegex(), $request->getUri()->getPath(), $matches)) {
+            $strategy = $this->getStrategy($matches[1]);
+            if ($strategy) {
+                $action = isset($matches[2]) && '/' != $matches[2] ? substr($matches[2], 1) : 'authenticate';
+                if (method_exists($strategy, $action)) {
+                    $strategy->setRequest($request);
+
+                    return call_user_func([$strategy, $action]);
+                }
+            }
+        }
+    }
+
     public function isAuthenticated()
     {
-        return isset($_SESSION[$this->configuration['auth_key']]);
+        return $this->storage->get($this->configuration['auth_key']) !== null;
     }
 
     public function getIdentity()
     {
-        return $_SESSION[$this->configuration['auth_key']] ?? null;
+        return $this->storage->get($this->configuration['auth_key']);
     }
 
-    public function setIdentity(array $identity)
+    public function setIdentity(array $identity, $strategyName)
     {
-        $_SESSION[$this->configuration['auth_key']] = $identity;
+        $identity =  call_user_func($this->configuration['identity_transformer'], $identity, $strategyName);
+        $this->storage->set($this->configuration['auth_key'], $identity);
     }
 
     public function buildUrl(string $strategy, $action)
@@ -108,9 +127,8 @@ class Omniauth implements MiddlewareInterface
 
     public function getCallbackUrl()
     {
-        if (isset($_SESSION[$this->configuration['redirect_uri_key']])) {
-            $redirect = $_SESSION[$this->configuration['redirect_uri_key']];
-            unset($_SESSION[$this->configuration['redirect_uri_key']]);
+        if ($redirect = $this->storage->get($this->configuration['redirect_uri_key'])) {
+            $this->storage->delete($this->configuration['redirect_uri_key']);
             return $redirect;
         } else {
             return $this->configuration['callback_url'];
@@ -124,7 +142,7 @@ class Omniauth implements MiddlewareInterface
                 $redirectUri = $redirectUri->getQuery() ? $redirectUri->getPath() . '?' . $redirectUri->getQuery()
                     : $redirectUri->getPath();
             }
-            $_SESSION[$this->configuration['redirect_uri_key']] = $redirectUri;
+            $this->storage->set($this->configuration['redirect_uri_key'], (string) $redirectUri);
         }
         $default = $this->configuration['default'] ?? array_keys($this->configuration['strategies'])[0];
         return $this->buildUrl($default, '');
@@ -139,6 +157,23 @@ class Omniauth implements MiddlewareInterface
         }
 
         return $strategy->transport($redirectUrl, $identity, $error);
+    }
+
+    /**
+     * @param string $name
+     *
+     * @return StrategyInterface|null
+     */
+    public function getStrategy($name)
+    {
+        if (isset($this->strategies[$name])) {
+            return $this->strategies[$name];
+        }
+        if ($this->strategyFactory->has($name)) {
+            return $this->strategies[$name] = $this->strategyFactory->create($name);
+        }
+
+        return null;
     }
 
     /**
@@ -191,22 +226,5 @@ class Omniauth implements MiddlewareInterface
         } else {
             throw new \RuntimeException('No psr/http-factory-implementation found, please install http-interop/http-factory-guzzle or http-interop/http-factory-diactoros');
         }
-    }
-
-    /**
-     * @param string $name
-     *
-     * @return StrategyInterface|null
-     */
-    private function getStrategy($name)
-    {
-        if (isset($this->strategies[$name])) {
-            return $this->strategies[$name];
-        }
-        if ($this->strategyFactory->has($name)) {
-            return $this->strategies[$name] = $this->strategyFactory->create($name);
-        }
-
-        return null;
     }
 }

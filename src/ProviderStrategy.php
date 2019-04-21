@@ -24,7 +24,7 @@ class ProviderStrategy extends AbstractStrategy
         'transport_method' => 'GET',
     ];
 
-    public function request()
+    public function authenticate()
     {
         $authUrl = $this->options['provider'];
         $authUrl .= (false === strpos($authUrl, '?') ? '?' : '&') . 'redirect_uri='
@@ -33,7 +33,7 @@ class ProviderStrategy extends AbstractStrategy
         return $this->redirect($authUrl);
     }
 
-    public function callback()
+    public function verify()
     {
         return $this->login($this->getIdentity());
     }
@@ -74,9 +74,9 @@ class ProviderStrategy extends AbstractStrategy
      */
     private function buildRedirectUri()
     {
-        return $this->request->getUri()->withPath($this->action('callback'))
+        return $this->request->getUri()->withPath($this->action('verify'))
             ->withQuery(http_build_query([
-                'redirect_uri' => (string) $this->request->getUri()
+                'redirect_uri' => $this->request->getUri()
             ]));
     }
 
@@ -113,14 +113,14 @@ class ProviderStrategy extends AbstractStrategy
         if (strtotime($data['timestamp']) < strtotime('-' . $this->options['timeout'])) {
             throw new AuthParameterException('auth response expired');
         }
-        if (!$this->verify($data)) {
+        if (!$this->verifySignature($data)) {
             throw new AuthParameterException('signature not match');
         }
 
         return json_decode($data['auth'], true);
     }
 
-    private function verify(array $data)
+    private function verifySignature(array $data)
     {
         $signType = isset($data['sign_type']) ? $data['sign_type'] : self::HMAC_SHA256;
         $signature = $data['sign'];

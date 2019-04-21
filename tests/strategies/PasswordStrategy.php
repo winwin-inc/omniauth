@@ -9,7 +9,7 @@ class PasswordStrategy extends AbstractStrategy
      */
     private $users;
 
-    public function request()
+    public function authenticate()
     {
         $content = <<<"EOF"
 <!doctype html>

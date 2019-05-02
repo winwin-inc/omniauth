@@ -18,13 +18,8 @@ interface StrategyFactoryInterface
      * @param string $name
      *
      * @return StrategyInterface
+     *
+     * @throws StrategyNotFoundException
      */
     public function create($name);
-
-    /**
-     * @param string $name
-     *
-     * @return bool
-     */
-    public function has($name);
 }

@@ -23,16 +23,6 @@ abstract class AbstractStrategy implements StrategyInterface
     protected $omniauth;
 
     /**
-     * @var ResponseFactoryInterface
-     */
-    protected $responseFactory;
-
-    /**
-     * @var StreamFactoryInterface
-     */
-    protected $streamFactory;
-
-    /**
      * @var ServerRequestInterface
      */
     protected $request;
@@ -42,49 +32,9 @@ abstract class AbstractStrategy implements StrategyInterface
      */
     protected $defaults = [];
 
-    /**
-     * AbstractStrategy constructor.
-     *
-     * @param string                   $name
-     * @param array                    $options
-     * @param Omniauth                 $omniauth
-     * @param ResponseFactoryInterface $responseFactory
-     * @param StreamFactoryInterface   $streamFactory
-     */
-    public function __construct($name, array $options, Omniauth $omniauth, ResponseFactoryInterface $responseFactory, StreamFactoryInterface $streamFactory)
+    public function setName($name)
     {
-        $this->omniauth = $omniauth;
-        $this->responseFactory = $responseFactory;
-        $this->streamFactory = $streamFactory;
         $this->name = $name;
-        $this->options = array_merge($this->defaults, $options);
-    }
-
-    public function setRequest(ServerRequestInterface $request)
-    {
-        $this->request = $request;
-    }
-
-    public function action($name = '', $absolute = false)
-    {
-        $url = $this->omniauth->buildUrl($this->name, $name);
-        if ($absolute) {
-            return $this->request->getUri()->withPath($url)->withQuery('');
-        } else {
-            return $url;
-        }
-    }
-
-    public function redirect($url)
-    {
-        return $this->responseFactory->createResponse(302)
-            ->withHeader('location', $url);
-    }
-
-    public function login($identity)
-    {
-        $this->omniauth->setIdentity($identity, $this->name);
-        return $this->redirect($this->omniauth->getCallbackUrl());
     }
 
     /**
@@ -103,6 +53,21 @@ abstract class AbstractStrategy implements StrategyInterface
         return $this->options;
     }
 
+    public function getOption(string $name, $default = null)
+    {
+        return $this->options[$name] ?? $default;
+    }
+
+    public function setOptions(array $options)
+    {
+        $this->options = $options + $this->defaults;
+    }
+
+    public function setOmniauth(Omniauth $omniauth)
+    {
+        $this->omniauth = $omniauth;
+    }
+
     /**
      * @return Omniauth
      */
@@ -117,5 +82,42 @@ abstract class AbstractStrategy implements StrategyInterface
     public function getRequest(): ServerRequestInterface
     {
         return $this->request;
+    }
+
+    public function setRequest(ServerRequestInterface $request)
+    {
+        $this->request = $request;
+    }
+
+    public function getResponseFactory()
+    {
+        return $this->omniauth->getResponseFactory();
+    }
+
+    public function getStreamFactory()
+    {
+        return $this->omniauth->getStreamFactory();
+    }
+
+    public function action($name = '', $absolute = false)
+    {
+        $url = $this->omniauth->buildUrl($this->name, $name);
+        if ($absolute) {
+            return $this->request->getUri()->withPath($url)->withQuery('');
+        } else {
+            return $url;
+        }
+    }
+
+    public function login($identity)
+    {
+        $this->omniauth->setIdentity($identity, $this->name);
+        return $this->redirect($this->omniauth->getCallbackUrl());
+    }
+
+    public function redirect($url)
+    {
+        return $this->getResponseFactory()->createResponse(302)
+            ->withHeader('location', $url);
     }
 }

@@ -4,9 +4,10 @@ namespace winwin\omniauth;
 
 use Http\Factory\Diactoros;
 use Http\Factory\Guzzle;
-use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\UriInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -40,13 +41,33 @@ class Omniauth implements MiddlewareInterface
     private $routeRegex;
 
     /**
+     * @var ResponseFactoryInterface
+     */
+    private $responseFactory;
+
+    /**
+     * @var StreamFactoryInterface
+     */
+    private $streamFactory;
+
+    /**
      * Omniauth constructor.
      *
      * @param array $config
+     * @param StorageInterface|null $storage
      * @param StrategyFactoryInterface|null $strategyFactory
      */
     public function __construct(array $config, StorageInterface $storage = null, StrategyFactoryInterface $strategyFactory = null)
     {
+        if (!isset($config['strategies'])) {
+            throw new \InvalidArgumentException('strategies is required');
+        }
+        if (!isset($config['strategies'][self::PROVIDER_STRATEGY])) {
+            $config['strategies'][self::PROVIDER_STRATEGY] = [];
+        }
+        if (!isset($config['strategies'][self::PROVIDER_STRATEGY]['strategy_class'])) {
+            $config['strategies'][self::PROVIDER_STRATEGY]['strategy_class'] = ProviderStrategy::class;
+        }
         $this->configuration = $config + [
                 'route' => '/:strategy/:action',
                 'auto_login' => true,
@@ -57,16 +78,12 @@ class Omniauth implements MiddlewareInterface
                     return $identity;
                 }
             ];
-        if (!isset($config['strategies'])) {
-            throw new \InvalidArgumentException('strategies is required');
-        }
+
         $this->storage = $storage ?: new SessionStorage();
-        if (!$strategyFactory) {
-            $strategyFactory = $this->createDefaultStrategyFactory();
-        }
-        $strategyFactory->setOmniauth($this);
-        $strategyFactory->setStrategies($config['strategies']);
-        $this->strategyFactory = $strategyFactory;
+
+        $this->strategyFactory = $strategyFactory ?: new StrategyFactory();
+        $this->strategyFactory->setOmniauth($this);
+        $this->strategyFactory->setStrategies($config['strategies']);
     }
 
     /**
@@ -89,14 +106,15 @@ class Omniauth implements MiddlewareInterface
     public function authenticate(ServerRequestInterface $request)
     {
         if (preg_match($this->getRouteRegex(), $request->getUri()->getPath(), $matches)) {
-            $strategy = $this->getStrategy($matches[1]);
-            if ($strategy) {
+            try {
+                $strategy = $this->getStrategy($matches[1]);
                 $action = isset($matches[2]) && '/' != $matches[2] ? substr($matches[2], 1) : 'authenticate';
                 if (method_exists($strategy, $action)) {
                     $strategy->setRequest($request);
 
                     return call_user_func([$strategy, $action]);
                 }
+            } catch (StrategyNotFoundException $e) {
             }
         }
     }
@@ -150,30 +168,28 @@ class Omniauth implements MiddlewareInterface
 
     public function transport($redirectUrl, array $identity, $error = null)
     {
-        /** @var ProviderStrategy $strategy */
-        $strategy = $this->getStrategy(self::PROVIDER_STRATEGY);
-        if (!$strategy) {
+        try {
+            /** @var ProviderStrategy $strategy */
+            $strategy = $this->getStrategy(self::PROVIDER_STRATEGY);
+            return $strategy->transport($redirectUrl, $identity, $error);
+        } catch (StrategyNotFoundException $e) {
             throw new \RuntimeException("please add 'provider' strategy option in configuration 'strategies'");
         }
-
-        return $strategy->transport($redirectUrl, $identity, $error);
     }
 
     /**
      * @param string $name
      *
-     * @return StrategyInterface|null
+     * @return StrategyInterface
+     * @throws StrategyNotFoundException
      */
     public function getStrategy($name)
     {
-        if (isset($this->strategies[$name])) {
-            return $this->strategies[$name];
-        }
-        if ($this->strategyFactory->has($name)) {
-            return $this->strategies[$name] = $this->strategyFactory->create($name);
+        if (!isset($this->strategies[$name])) {
+            $this->strategies[$name] = $this->strategyFactory->create($name);
         }
 
-        return null;
+        return $this->strategies[$name];
     }
 
     /**
@@ -198,33 +214,31 @@ class Omniauth implements MiddlewareInterface
         return $this->routeRegex;
     }
 
-    private function createDefaultStrategyFactory()
+    public function getResponseFactory()
     {
-        $factory = new StrategyFactory($this->getResponseFactory(), $this->getStreamFactory());
-        $factory->register(self::PROVIDER_STRATEGY, ProviderStrategy::class);
-
-        return $factory;
+        if (!$this->responseFactory) {
+            if (class_exists(Diactoros\ResponseFactory::class)) {
+                $this->responseFactory = new Diactoros\ResponseFactory();
+            } elseif (class_exists(Guzzle\ResponseFactory::class)) {
+                $this->responseFactory = new Guzzle\ResponseFactory();
+            } else {
+                throw new \RuntimeException('No psr/http-factory-implementation found, please install http-interop/http-factory-guzzle or http-interop/http-factory-diactoros');
+            }
+        }
+        return $this->responseFactory;
     }
 
-    private function getResponseFactory()
+    public function getStreamFactory()
     {
-        if (class_exists(Diactoros\ResponseFactory::class)) {
-            return new Diactoros\ResponseFactory();
-        } elseif (class_exists(Guzzle\ResponseFactory::class)) {
-            return new Guzzle\ResponseFactory();
-        } else {
-            throw new \RuntimeException('No psr/http-factory-implementation found, please install http-interop/http-factory-guzzle or http-interop/http-factory-diactoros');
+        if (!$this->streamFactory) {
+            if (class_exists(Diactoros\StreamFactory::class)) {
+                $this->streamFactory = new Diactoros\StreamFactory();
+            } elseif (class_exists(Guzzle\StreamFactory::class)) {
+                $this->streamFactory = new Guzzle\StreamFactory();
+            } else {
+                throw new \RuntimeException('No psr/http-factory-implementation found, please install http-interop/http-factory-guzzle or http-interop/http-factory-diactoros');
+            }
         }
-    }
-
-    private function getStreamFactory()
-    {
-        if (class_exists(Diactoros\StreamFactory::class)) {
-            return new Diactoros\StreamFactory();
-        } elseif (class_exists(Guzzle\StreamFactory::class)) {
-            return new Guzzle\StreamFactory();
-        } else {
-            throw new \RuntimeException('No psr/http-factory-implementation found, please install http-interop/http-factory-guzzle or http-interop/http-factory-diactoros');
-        }
+        return $this->streamFactory;
     }
 }

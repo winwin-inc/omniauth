@@ -22,7 +22,7 @@ $auth = new Omniauth([
                 ]
             ]
         ],
-        'github' => [
+        'git-hub' => [
             'keys' => [
                 'id' => getenv("GITHUB_APP_ID"),
                 'secret' => getenv("GITHUB_APP_SECRET"),

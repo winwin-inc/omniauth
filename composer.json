@@ -18,7 +18,8 @@
         "http-interop/http-factory-diactoros": "^1.0",
         "http-interop/http-factory-guzzle": "^1.0",
         "hybridauth/hybridauth": "~3.0",
-        "vlucas/phpdotenv": "^3.3"
+        "vlucas/phpdotenv": "^3.3",
+        "psr/container": "^1.0"
     },
     "suggest": {
         "hybridauth/hybridauth": "To use oauth2 providers implements in Hybridauth 3"

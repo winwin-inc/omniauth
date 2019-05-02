@@ -30,12 +30,12 @@ class PasswordStrategy extends AbstractStrategy
       <p class="tip">Try username admin and password admin</p>
     </form>
     <a href="/auth/provider">External Login</a>
-    <a href="/auth/github">Github Login</a>
+    <a href="/auth/git-hub">Github Login</a>
   </body>
 </html>
 EOF;
-        return $this->responseFactory->createResponse()
-            ->withBody($this->streamFactory->createStream($content));
+        return $this->getResponseFactory()->createResponse()
+            ->withBody($this->getStreamFactory()->createStream($content));
     }
 
     public function verify()
@@ -53,11 +53,9 @@ EOF;
 
     private function buildUsers()
     {
-        if (isset($this->users)) {
-            return;
-        }
-        if (isset($this->options['users'])) {
-            foreach ($this->options['users'] as $user) {
+        if (!isset($this->users)) {
+            $this->users = [];
+            foreach ($this->getOption('users', []) as $user) {
                 $this->users[$user['user_id']] = $user;
             }
         }

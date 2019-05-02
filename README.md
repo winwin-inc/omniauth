@@ -54,6 +54,6 @@ A function to transformer user identity before save to session.
 
 Check out [PasswordStrategy](tests/strategies/PasswordStrategy.php) to see how to implements an new authentication strategy.
 
-Usually, a strategy should extends [AbstractStrategy](src/AbstractStrategy.php) and have to implement two function `authentication` and `verify`.
-The `authentication` function initiate the authentication flow,
+Usually, a strategy should extends [AbstractStrategy](src/AbstractStrategy.php) and have to implement two function `authenticate` and `verify`.
+The `authenticate` function initiate the authentication flow,
 and the `verify` function will check user's credential and call `$this->login($user)` to set user identity and return back the page before login.

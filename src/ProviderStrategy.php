@@ -52,8 +52,7 @@ class ProviderStrategy extends AbstractStrategy
         $data['sign_type'] = $this->options['sign_type'];
         $data['sign'] = $this->sign($data);
         if ('GET' == $this->options['transport_method']) {
-            return $this->responseFactory->createResponse(302)
-                ->withHeader('location', $redirectUrl . (false === strpos($redirectUrl, '?') ? '?' : '&') . 'auth=' . base64_encode(json_encode($data)));
+            return $this->redirect($redirectUrl . (false === strpos($redirectUrl, '?') ? '?' : '&') . 'auth=' . base64_encode(json_encode($data)));
         } else {
             $html = '<!doctype html><html lang="en"><body onload="postit();"><form name="auth" method="post" action="' . $redirectUrl . '">';
             foreach ($data as $key => $value) {
@@ -64,8 +63,8 @@ class ProviderStrategy extends AbstractStrategy
             $html .= '<script type="text/javascript">function postit(){ document.auth.submit(); }</script>';
             $html .= '</body></html>';
 
-            return $this->responseFactory->createResponse()
-                ->withBody($this->streamFactory->createStream($html));
+            return $this->getResponseFactory()->createResponse()
+                ->withBody($this->getStreamFactory()->createStream($html));
         }
     }
 

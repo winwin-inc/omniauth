@@ -2,9 +2,6 @@
 
 namespace winwin\omniauth;
 
-use Psr\Http\Message\ResponseFactoryInterface;
-use Psr\Http\Message\StreamFactoryInterface;
-
 class StrategyFactory implements StrategyFactoryInterface
 {
     /**
@@ -18,31 +15,14 @@ class StrategyFactory implements StrategyFactoryInterface
     private $strategies;
 
     /**
-     * @var ResponseFactoryInterface
-     */
-    private $responseFactory;
-
-    /**
-     * @var StreamFactoryInterface
-     */
-    private $streamFactory;
-
-    /**
      * @var string[]
      */
     private $strategyClasses;
 
     /**
-     * StrategyFactory constructor.
-     *
-     * @param ResponseFactoryInterface $responseFactory
-     * @param StreamFactoryInterface   $streamFactory
+     * @var callable
      */
-    public function __construct(ResponseFactoryInterface $responseFactory, StreamFactoryInterface $streamFactory)
-    {
-        $this->responseFactory = $responseFactory;
-        $this->streamFactory = $streamFactory;
-    }
+    private $strategyInstantiator;
 
     public function setOmniauth(Omniauth $omniauth)
     {
@@ -54,9 +34,13 @@ class StrategyFactory implements StrategyFactoryInterface
         $this->strategies = $strategies;
     }
 
-    public function has($name)
+    /**
+     * @param callable $strategyInstantiator
+     * @return static
+     */
+    public function setStrategyInstantiator($strategyInstantiator)
     {
-        return isset($this->strategies[$name]);
+        $this->strategyInstantiator = $strategyInstantiator;
     }
 
     public function register($name, $strategyClass)
@@ -67,8 +51,27 @@ class StrategyFactory implements StrategyFactoryInterface
     public function create($name)
     {
         if (!isset($this->strategies[$name])) {
-            throw new \InvalidArgumentException("Unknown strategy '$name");
+            throw new StrategyNotFoundException("Unknown strategy '$name");
         }
+        $strategyClass = $this->getStrategyClass($name);
+
+        if (class_exists($strategyClass)) {
+            $strategy = $this->newStrategy($strategyClass);
+            $strategy->setName($name);
+            $strategy->setOptions($this->strategies[$name]);
+            $strategy->setOmniauth($this->omniauth);
+            return $strategy;
+        } else {
+            throw new \InvalidArgumentException("Strategy class $strategyClass for $name not found");
+        }
+    }
+
+    /**
+     * @param string $name
+     * @return string
+     */
+    protected function getStrategyClass($name)
+    {
         $options = $this->strategies[$name];
         if (isset($options['strategy_class'])) {
             $strategyClass = $options['strategy_class'];
@@ -78,13 +81,17 @@ class StrategyFactory implements StrategyFactoryInterface
         } elseif (isset($this->strategyClasses[$name])) {
             $strategyClass = $this->strategyClasses[$name];
         } else {
-            $strategyClass = Text::camelize($name).'Strategy';
+            $strategyClass = Text::camelize($name) . 'Strategy';
         }
+        return $strategyClass;
+    }
 
-        if (class_exists($strategyClass)) {
-            return new $strategyClass($name, $options, $this->omniauth, $this->responseFactory, $this->streamFactory);
-        } else {
-            throw new \InvalidArgumentException("Strategy class $strategyClass for $name not found");
-        }
+    /**
+     * @param string $strategyClass
+     * @return StrategyInterface
+     */
+    protected function newStrategy(string $strategyClass)
+    {
+        return $this->strategyInstantiator ? call_user_func($this->strategyInstantiator, $strategyClass) : new $strategyClass();
     }
 }

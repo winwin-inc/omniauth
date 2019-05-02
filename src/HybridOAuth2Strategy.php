@@ -8,6 +8,7 @@ use Hybridauth\Adapter\OAuth2;
 use Hybridauth\HttpClient\HttpClientInterface;
 use Hybridauth\HttpClient\Util;
 use Hybridauth\Logger\LoggerInterface;
+use Psr\Http\Message\ResponseInterface;
 
 class HybridOAuth2Strategy extends AbstractStrategy
 {
@@ -31,6 +32,11 @@ class HybridOAuth2Strategy extends AbstractStrategy
      */
     private static $logger;
 
+    /**
+     * @return ResponseInterface
+     * @throws \Hybridauth\Exception\Exception
+     * @throws \Hybridauth\Exception\NotImplementedException
+     */
     public function authenticate()
     {
         try {
@@ -45,6 +51,11 @@ class HybridOAuth2Strategy extends AbstractStrategy
         }
     }
 
+    /**
+     * @return ResponseInterface
+     * @throws \Hybridauth\Exception\Exception
+     * @throws \Hybridauth\Exception\NotImplementedException
+     */
     public function verify()
     {
         return $this->authenticate();
@@ -56,7 +67,7 @@ class HybridOAuth2Strategy extends AbstractStrategy
     public function getHybridAuth()
     {
         if (!$this->hybridAuth) {
-            $providerClass = $this->options['provider_class'] ?? 'Hybridauth\\Provider\\' . ucfirst($this->name);
+            $providerClass = $this->options['provider_class'] ?? 'Hybridauth\\Provider\\' . Text::camelize($this->name);
             $options = $this->options + [
                     'callback' => $this->action('verify', true)
                 ];

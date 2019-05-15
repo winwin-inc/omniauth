@@ -86,6 +86,19 @@ class Omniauth implements MiddlewareInterface
         $this->strategyFactory->setStrategies($config['strategies']);
     }
 
+    public function __invoke(ServerRequestInterface $request, ResponseInterface $response, callable $next)
+    {
+        $response = $this->authenticate($request);
+        if ($response) {
+            return $response;
+        } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated() && !$this->match($request)) {
+            return $this->getResponseFactory()->createResponse(302)
+                ->withHeader("location", $this->getDefaultAuthUrl($request->getUri()));
+        }
+
+        return $next($request, $response);
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -94,10 +107,9 @@ class Omniauth implements MiddlewareInterface
         $response = $this->authenticate($request);
         if ($response) {
             return $response;
-        } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated()
-            && !preg_match($this->getRouteRegex(), $request->getUri()->getPath())) {
+        } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated() && !$this->match($request)) {
             return $this->getResponseFactory()->createResponse(302)
-                ->withHeader("location", $this->getDefaultAuthUrl($request->getUri()));
+                ->withHeader("location", $this->getDefaultAuthUrl($request));
         }
 
         return $handler->handle($request);
@@ -105,7 +117,7 @@ class Omniauth implements MiddlewareInterface
 
     public function authenticate(ServerRequestInterface $request)
     {
-        if (preg_match($this->getRouteRegex(), $request->getUri()->getPath(), $matches)) {
+        if ($matches = $this->match($request)) {
             try {
                 $strategy = $this->getStrategy($matches[1]);
                 $action = isset($matches[2]) && '/' != $matches[2] ? substr($matches[2], 1) : 'authenticate';
@@ -116,6 +128,13 @@ class Omniauth implements MiddlewareInterface
                 }
             } catch (StrategyNotFoundException $e) {
             }
+        }
+    }
+
+    public function match(ServerRequestInterface $request)
+    {
+        if (preg_match($this->getRouteRegex(), $request->getUri()->getPath(), $matches)) {
+            return $matches;
         }
     }
 
@@ -153,16 +172,20 @@ class Omniauth implements MiddlewareInterface
         }
     }
 
-    public function getDefaultAuthUrl($redirectUri = null)
+    public function getDefaultAuthUrl(ServerRequestInterface $request, $redirectUri = null)
     {
-        if ($redirectUri) {
-            if ($redirectUri instanceof UriInterface) {
-                $redirectUri = $redirectUri->getQuery() ? $redirectUri->getPath() . '?' . $redirectUri->getQuery()
-                    : $redirectUri->getPath();
-            }
-            $this->storage->set($this->configuration['redirect_uri_key'], (string) $redirectUri);
+        if (!$redirectUri) {
+            $redirectUri = $request->getUri();
         }
+        if ($redirectUri instanceof UriInterface) {
+            $redirectUri = $redirectUri->getQuery() ? $redirectUri->getPath() . '?' . $redirectUri->getQuery()
+                : $redirectUri->getPath();
+        }
+        $this->storage->set($this->configuration['redirect_uri_key'], (string)$redirectUri);
         $default = $this->configuration['default'] ?? array_keys($this->configuration['strategies'])[0];
+        if (is_callable($default)) {
+            $default = $default($request);
+        }
         return $this->buildUrl($default, '');
     }
 

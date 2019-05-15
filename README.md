@@ -23,6 +23,7 @@ by call:
 <?php
 $omniauth->getStrategyFactory()->register($providerName, $strategyClass);
 ```
+### default
 
 ### route
 
@@ -57,3 +58,11 @@ Check out [PasswordStrategy](tests/strategies/PasswordStrategy.php) to see how t
 Usually, a strategy should extends [AbstractStrategy](src/AbstractStrategy.php) and have to implement two function `authenticate` and `verify`.
 The `authenticate` function initiate the authentication flow,
 and the `verify` function will check user's credential and call `$this->login($user)` to set user identity and return back the page before login.
+
+## API
+
+```php
+<?php
+
+$omniauth->getStrategy($name)->authenticate();
+```

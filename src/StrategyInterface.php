@@ -30,4 +30,9 @@ interface StrategyInterface
      * Initiate the appropriate protocol and process/automate the authentication or authorization flow.
      */
     public function authenticate();
+
+    /**
+     * Clear stored data
+     */
+    public function clear();
 }

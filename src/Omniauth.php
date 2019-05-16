@@ -15,6 +15,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 class Omniauth implements MiddlewareInterface
 {
     const PROVIDER_STRATEGY = 'provider';
+    const STRATEGY_KEY = '_omniauth_strategy';
     /**
      * @var array
      */
@@ -93,7 +94,7 @@ class Omniauth implements MiddlewareInterface
             return $response;
         } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated() && !$this->match($request)) {
             return $this->getResponseFactory()->createResponse(302)
-                ->withHeader("location", $this->getDefaultAuthUrl($request->getUri()));
+                ->withHeader("location", $this->getDefaultAuthUrl($request));
         }
 
         return $next($request, $response);
@@ -143,6 +144,16 @@ class Omniauth implements MiddlewareInterface
         return $this->storage->get($this->configuration['auth_key']) !== null;
     }
 
+    public function clear()
+    {
+        $this->storage->delete($this->configuration['auth_key']);
+        $strategy = $this->storage->get(self::STRATEGY_KEY);
+        if ($strategy) {
+            $this->storage->delete(self::STRATEGY_KEY);
+            $this->getStrategy($strategy)->clear();
+        }
+    }
+
     public function getIdentity()
     {
         return $this->storage->get($this->configuration['auth_key']);
@@ -152,6 +163,7 @@ class Omniauth implements MiddlewareInterface
     {
         $identity =  call_user_func($this->configuration['identity_transformer'], $identity, $this->getStrategy($strategyName));
         $this->storage->set($this->configuration['auth_key'], $identity);
+        $this->storage->set(self::STRATEGY_KEY, $strategyName);
     }
 
     public function buildUrl(string $strategy, $action)

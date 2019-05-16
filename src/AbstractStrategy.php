@@ -120,4 +120,8 @@ abstract class AbstractStrategy implements StrategyInterface
         return $this->getResponseFactory()->createResponse(302)
             ->withHeader('location', $url);
     }
+
+    public function clear()
+    {
+    }
 }

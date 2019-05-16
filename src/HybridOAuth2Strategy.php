@@ -76,6 +76,11 @@ class HybridOAuth2Strategy extends AbstractStrategy
         return $this->hybridAuth;
     }
 
+    public function clear()
+    {
+        $this->getHybridAuth()->disconnect();
+    }
+
     public static function setUp(HttpClientInterface $httpClient = null, \Hybridauth\Storage\StorageInterface $storage = null, LoggerInterface $logger = null)
     {
         self::$httpClient = $httpClient;

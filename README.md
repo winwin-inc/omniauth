@@ -6,9 +6,23 @@ Omniauth is a middleware for multi-provider authentication inspired by [Opauth](
 
 Check out and see [examples](examples/index.php) to find how it work.
 
-## Configuration
-
 The constructor of the `Omniauth` class has serval options to control its behavior.
+
+```php
+<?php
+
+use winwin\omniauth\Omniauth;
+
+$omniauth = new Omniauth([
+    'route' => '/auth/:strategy/:action',
+    'strategies' => [
+        'provider' => [
+            'provider' => 'http://my-login-service/login',
+            'key' => 'mysecretkey'
+        ]
+    ]
+]);
+```
 
 ### strategies
 
@@ -21,7 +35,8 @@ by call:
 
 ```php
 <?php
-$omniauth->getStrategyFactory()->register($providerName, $strategyClass);
+
+$omniauth->getStrategyFactory()->register($strategyName, $strategyClass);
 ```
 ### default
 
@@ -64,5 +79,14 @@ and the `verify` function will check user's credential and call `$this->login($u
 ```php
 <?php
 
-$omniauth->getStrategy($name)->authenticate();
+if (!$omniauth->isAuthenticated()) {
+    $omniauth->getStrategy($strategyName)->authenticate();
+}
+
+if ($omniauth->isAuthenticated()) {
+    $userProfile = $omniauth->getIdentity();
+}
+
+$omniauth->clear();
 ```
+

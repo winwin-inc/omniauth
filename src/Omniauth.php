@@ -89,9 +89,9 @@ class Omniauth implements MiddlewareInterface
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response, callable $next)
     {
-        $response = $this->authenticate($request);
-        if ($response) {
-            return $response;
+        $result = $this->authenticate($request);
+        if ($result) {
+            return $result;
         } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated() && !$this->match($request)) {
             return $this->getResponseFactory()->createResponse(302)
                 ->withHeader("location", $this->getDefaultAuthUrl($request));

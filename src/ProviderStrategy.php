@@ -71,7 +71,7 @@ class ProviderStrategy extends AbstractStrategy
     /**
      * @return \Psr\Http\Message\UriInterface
      */
-    private function buildRedirectUri()
+    protected function buildRedirectUri()
     {
         return $this->request->getUri()->withPath($this->action('verify'))
             ->withQuery(http_build_query([

@@ -1,25 +1,35 @@
 <?php
 
+declare(strict_types=1);
+
 namespace winwin\omniauth;
 
-use Http\Factory\Diactoros;
-use Http\Factory\Guzzle;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\UriInterface;
-use Psr\Http\Server\MiddlewareInterface;
-use Psr\Http\Server\RequestHandlerInterface;
+use winwin\omniauth\exception\StrategyNotFoundException;
+use winwin\omniauth\strategy\ProviderStrategy;
+use winwin\omniauth\strategy\StrategyDetectorInterface;
+use winwin\omniauth\strategy\StrategyInterface;
 
-class Omniauth implements MiddlewareInterface
+class Omniauth
 {
-    const PROVIDER_STRATEGY = 'provider';
-    const STRATEGY_KEY = '_omniauth_strategy';
+    public const REQUEST_AUTH_KEY = '__OMNIAUTH';
+
+    public const PROVIDER_STRATEGY = 'provider';
+    private const STRATEGY_KEY = '_omniauth_strategy';
+
     /**
-     * @var array
+     * @var ServerRequestInterface
      */
-    private $configuration;
+    private $request;
+
+    /**
+     * @var Config
+     */
+    private $config;
 
     /**
      * @var StorageInterface
@@ -32,16 +42,6 @@ class Omniauth implements MiddlewareInterface
     private $strategyFactory;
 
     /**
-     * @var StrategyInterface[]
-     */
-    private $strategies;
-
-    /**
-     * @var string
-     */
-    private $routeRegex;
-
-    /**
      * @var ResponseFactoryInterface
      */
     private $responseFactory;
@@ -52,160 +52,167 @@ class Omniauth implements MiddlewareInterface
     private $streamFactory;
 
     /**
-     * Omniauth constructor.
-     *
-     * @param array $config
-     * @param StorageInterface|null $storage
-     * @param StrategyFactoryInterface|null $strategyFactory
+     * @var StrategyDetectorInterface
      */
-    public function __construct(array $config, StorageInterface $storage = null, StrategyFactoryInterface $strategyFactory = null)
-    {
-        if (!isset($config['strategies'])) {
-            throw new \InvalidArgumentException('strategies is required');
-        }
-        if (!isset($config['strategies'][self::PROVIDER_STRATEGY])) {
-            $config['strategies'][self::PROVIDER_STRATEGY] = [];
-        }
-        if (!isset($config['strategies'][self::PROVIDER_STRATEGY]['strategy_class'])) {
-            $config['strategies'][self::PROVIDER_STRATEGY]['strategy_class'] = ProviderStrategy::class;
-        }
-        $this->configuration = $config + [
-                'route' => '/:strategy/:action',
-                'auto_login' => true,
-                'auth_key' => 'auth',
-                'redirect_uri_key' => 'login_redirect_uri',
-                'callback_url' => '/',
-                'identity_transformer' => function(array $identity) {
-                    return $identity;
-                }
-            ];
-
-        $this->storage = $storage ?: new SessionStorage();
-
-        $this->strategyFactory = $strategyFactory ?: new StrategyFactory();
-        $this->strategyFactory->setOmniauth($this);
-        $this->strategyFactory->setStrategies($config['strategies']);
-    }
-
-    public function __invoke(ServerRequestInterface $request, ResponseInterface $response, callable $next)
-    {
-        $result = $this->authenticate($request);
-        if ($result) {
-            return $result;
-        } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated() && !$this->match($request)) {
-            return $this->getResponseFactory()->createResponse(302)
-                ->withHeader("location", $this->getDefaultAuthUrl($request));
-        }
-
-        return $next($request, $response);
-    }
+    private $strategyDetector;
 
     /**
-     * {@inheritdoc}
+     * @var IdentityTransformerInterface
      */
-    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
-    {
-        $response = $this->authenticate($request);
-        if ($response) {
-            return $response;
-        } elseif ($this->configuration['auto_login'] && !$this->isAuthenticated() && !$this->match($request)) {
-            return $this->getResponseFactory()->createResponse(302)
-                ->withHeader("location", $this->getDefaultAuthUrl($request));
-        }
+    private $identityTransformer;
 
-        return $handler->handle($request);
+    /**
+     * @var array<string,StrategyInterface>
+     */
+    private $strategies;
+
+    public function __construct(ServerRequestInterface $request, Config $config, StorageInterface $storage, StrategyFactoryInterface $strategyFactory, ResponseFactoryInterface $responseFactory, StreamFactoryInterface $streamFactory, StrategyDetectorInterface $strategyDetector, IdentityTransformerInterface $identityTransformer)
+    {
+        $this->request = $request;
+        $this->config = $config;
+        $this->storage = $storage;
+        $this->strategyFactory = $strategyFactory;
+        $this->responseFactory = $responseFactory;
+        $this->streamFactory = $streamFactory;
+        $this->strategyDetector = $strategyDetector;
+        $this->identityTransformer = $identityTransformer;
     }
 
-    public function authenticate(ServerRequestInterface $request)
+    public static function get(ServerRequestInterface $request): ?Omniauth
     {
-        if ($matches = $this->match($request)) {
-            try {
-                $strategy = $this->getStrategy($matches[1]);
-                $action = isset($matches[2]) && '/' != $matches[2] ? substr($matches[2], 1) : 'authenticate';
-                if (method_exists($strategy, $action)) {
-                    $strategy->setRequest($request);
+        return $request->getAttribute(self::REQUEST_AUTH_KEY);
+    }
 
-                    return call_user_func([$strategy, $action]);
-                }
+    public function authenticate(): ?ResponseInterface
+    {
+        $matches = $this->match($this->request);
+        if (null === $matches) {
+            if ($this->config->isAutoLogin() && !$this->isAuthenticated()) {
+                return $this->responseFactory->createResponse(302)
+                    ->withHeader('location', $this->getDefaultAuthUrl());
+            }
+
+            return null;
+        } else {
+            return $this->doAuthenticate($matches[1], $matches[2] ?? null);
+        }
+    }
+
+    private function doAuthenticate(string $strategyName, ?string $action): ?ResponseInterface
+    {
+        try {
+            $strategy = $this->createStrategy($strategyName);
+        } catch (StrategyNotFoundException $e) {
+            var_export(['no strategy', $strategyName, $e->getMessage()]);
+
+            return null;
+        }
+        if (Text::isEmpty($action) || '/' === $action) {
+            $action = 'authenticate';
+        } else {
+            $action = trim($action, '/');
+        }
+        if (method_exists($strategy, $action)) {
+            return $strategy->$action();
+        }
+
+        return null;
+    }
+
+    public function match(ServerRequestInterface $request): ?array
+    {
+        if (preg_match($this->config->getRouteRegex(), $request->getUri()->getPath(), $matches)) {
+            return $matches;
+        }
+
+        return null;
+    }
+
+    public function isAuthenticated(): bool
+    {
+        return null !== $this->getIdentity();
+    }
+
+    public function clear(): void
+    {
+        $this->storage->delete($this->config->getAuthKey());
+        $strategy = $this->storage->get(self::STRATEGY_KEY);
+        if (null !== $strategy) {
+            $this->storage->delete(self::STRATEGY_KEY);
+            try {
+                $this->createStrategy($strategy)->clear();
             } catch (StrategyNotFoundException $e) {
             }
         }
     }
 
-    public function match(ServerRequestInterface $request)
-    {
-        if (preg_match($this->getRouteRegex(), $request->getUri()->getPath(), $matches)) {
-            return $matches;
-        }
-    }
-
-    public function isAuthenticated()
-    {
-        return $this->storage->get($this->configuration['auth_key']) !== null;
-    }
-
-    public function clear()
-    {
-        $this->storage->delete($this->configuration['auth_key']);
-        $strategy = $this->storage->get(self::STRATEGY_KEY);
-        if ($strategy) {
-            $this->storage->delete(self::STRATEGY_KEY);
-            $this->getStrategy($strategy)->clear();
-        }
-    }
-
+    /**
+     * @return mixed
+     */
     public function getIdentity()
     {
-        return $this->storage->get($this->configuration['auth_key']);
+        return $this->storage->get($this->config->getAuthKey());
     }
 
-    public function setIdentity(array $identity, $strategyName)
+    public function setIdentity(array $identity, string $strategyName): void
     {
-        $identity =  call_user_func($this->configuration['identity_transformer'], $identity, $this->getStrategy($strategyName));
-        $this->storage->set($this->configuration['auth_key'], $identity);
+        $this->storage->set($this->config->getAuthKey(), $this->identityTransformer->transform($identity, $strategyName));
         $this->storage->set(self::STRATEGY_KEY, $strategyName);
     }
 
-    public function buildUrl(string $strategy, $action)
+    public function buildUrl(string $strategy, string $action): string
     {
-        return strtr($this->configuration['route'], [
+        return strtr($this->config->getRoute(), [
             ':strategy' => $strategy,
             ':action' => $action,
         ]);
     }
 
-    public function getCallbackUrl()
+    public function getCallbackUrl(): string
     {
-        if ($redirect = $this->storage->get($this->configuration['redirect_uri_key'])) {
-            $this->storage->delete($this->configuration['redirect_uri_key']);
+        $redirect = $this->storage->get($this->config->getRedirectUriKey());
+        if (Text::isNotEmpty($redirect)) {
+            $this->storage->delete($this->config->getRedirectUriKey());
+
             return $redirect;
-        } else {
-            return $this->configuration['callback_url'];
         }
+
+        return $this->config->getCallbackUrl();
     }
 
-    public function getDefaultAuthUrl(ServerRequestInterface $request, $redirectUri = null)
+    /**
+     * @param string|UriInterface|null $redirectUri
+     *
+     * @return string
+     */
+    public function getDefaultAuthUrl($redirectUri = null): string
     {
-        if (!$redirectUri) {
-            $redirectUri = $request->getUri();
+        if (null === $redirectUri) {
+            $redirectUri = $this->request->getUri();
         }
         if ($redirectUri instanceof UriInterface) {
-            $redirectUri = $redirectUri->getQuery() ? $redirectUri->getPath() . '?' . $redirectUri->getQuery()
+            $redirectUri = Text::isNotEmpty($redirectUri->getQuery())
+                ? $redirectUri->getPath().'?'.$redirectUri->getQuery()
                 : $redirectUri->getPath();
         }
-        $this->storage->set($this->configuration['redirect_uri_key'], (string)$redirectUri);
-        $default = $this->configuration['default'] ?? array_keys($this->configuration['strategies'])[0];
-        if (is_callable($default)) {
-            $default = $default($request);
-        }
-        return $this->buildUrl($default, '');
+        $this->storage->set($this->config->getRedirectUriKey(), (string) $redirectUri);
+
+        return $this->buildUrl($this->strategyDetector->detect($this->request), '');
     }
 
-    public function transport($redirectUrl, array $identity, $error = null)
+    /**
+     * @param string            $redirectUrl
+     * @param array             $identity
+     * @param string|array|null $error
+     *
+     * @return ResponseInterface
+     */
+    public function transport(string $redirectUrl, array $identity, $error = null): ResponseInterface
     {
         try {
             /** @var ProviderStrategy $strategy */
-            $strategy = $this->getStrategy(self::PROVIDER_STRATEGY);
+            $strategy = $this->createStrategy(self::PROVIDER_STRATEGY);
+
             return $strategy->transport($redirectUrl, $identity, $error);
         } catch (StrategyNotFoundException $e) {
             throw new \RuntimeException("please add 'provider' strategy option in configuration 'strategies'");
@@ -216,64 +223,55 @@ class Omniauth implements MiddlewareInterface
      * @param string $name
      *
      * @return StrategyInterface
+     *
      * @throws StrategyNotFoundException
      */
-    public function getStrategy($name)
+    public function createStrategy(string $name): StrategyInterface
     {
         if (!isset($this->strategies[$name])) {
-            $this->strategies[$name] = $this->strategyFactory->create($name);
+            $this->strategies[$name] = $this->strategyFactory->create($this, $name);
         }
 
         return $this->strategies[$name];
     }
 
     /**
-     * @return StrategyFactoryInterface
+     * @return Config
      */
-    public function getStrategyFactory()
+    public function getConfig(): Config
     {
-        return $this->strategyFactory;
+        return $this->config;
     }
 
-    private function getRouteRegex()
+    /**
+     * @return StorageInterface
+     */
+    public function getStorage(): StorageInterface
     {
-        if (!$this->routeRegex) {
-            $re = $this->configuration['route'];
-            $strategyRe = implode('|', array_map('preg_quote', array_keys($this->configuration['strategies'])));
-            $re = str_replace(':strategy', '('.$strategyRe.')', $re);
-            $re = str_replace('/:action', '(/[A-Za-z0-9-_]*)?', $re);
-
-            $this->routeRegex = '#^' . $re . '$#';
-        }
-
-        return $this->routeRegex;
+        return $this->storage;
     }
 
-    public function getResponseFactory()
+    /**
+     * @return ResponseFactoryInterface
+     */
+    public function getResponseFactory(): ResponseFactoryInterface
     {
-        if (!$this->responseFactory) {
-            if (class_exists(Diactoros\ResponseFactory::class)) {
-                $this->responseFactory = new Diactoros\ResponseFactory();
-            } elseif (class_exists(Guzzle\ResponseFactory::class)) {
-                $this->responseFactory = new Guzzle\ResponseFactory();
-            } else {
-                throw new \RuntimeException('No psr/http-factory-implementation found, please install http-interop/http-factory-guzzle or http-interop/http-factory-diactoros');
-            }
-        }
         return $this->responseFactory;
     }
 
-    public function getStreamFactory()
+    /**
+     * @return StreamFactoryInterface
+     */
+    public function getStreamFactory(): StreamFactoryInterface
     {
-        if (!$this->streamFactory) {
-            if (class_exists(Diactoros\StreamFactory::class)) {
-                $this->streamFactory = new Diactoros\StreamFactory();
-            } elseif (class_exists(Guzzle\StreamFactory::class)) {
-                $this->streamFactory = new Guzzle\StreamFactory();
-            } else {
-                throw new \RuntimeException('No psr/http-factory-implementation found, please install http-interop/http-factory-guzzle or http-interop/http-factory-diactoros');
-            }
-        }
         return $this->streamFactory;
+    }
+
+    /**
+     * @return ServerRequestInterface
+     */
+    public function getRequest(): ServerRequestInterface
+    {
+        return $this->request;
     }
 }

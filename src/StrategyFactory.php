@@ -1,21 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace winwin\omniauth;
+
+use winwin\omniauth\exception\StrategyNotFoundException;
+use winwin\omniauth\strategy\StrategyInterface;
 
 class StrategyFactory implements StrategyFactoryInterface
 {
     /**
-     * @var Omniauth
-     */
-    private $omniauth;
-
-    /**
      * @var array
      */
-    private $strategies;
+    private $strategyOptions;
 
     /**
-     * @var string[]
+     * @var array<string,string>
      */
     private $strategyClasses;
 
@@ -24,55 +24,48 @@ class StrategyFactory implements StrategyFactoryInterface
      */
     private $strategyInstantiator;
 
-    public function setOmniauth(Omniauth $omniauth)
-    {
-        $this->omniauth = $omniauth;
-    }
-
-    public function setStrategies(array $strategies)
-    {
-        $this->strategies = $strategies;
-    }
-
     /**
+     * StrategyFactory constructor.
+     *
+     * @param array    $strategyOptions
      * @param callable $strategyInstantiator
-     * @return static
      */
-    public function setStrategyInstantiator($strategyInstantiator)
+    public function __construct(array $strategyOptions, ?callable $strategyInstantiator = null)
     {
+        $this->strategyOptions = $strategyOptions;
         $this->strategyInstantiator = $strategyInstantiator;
     }
 
-    public function register($name, $strategyClass)
+    public function register(string $name, string $strategyClass): void
     {
         $this->strategyClasses[$name] = $strategyClass;
     }
 
-    public function create($name)
+    /**
+     * {@inheritdoc}
+     */
+    public function create(Omniauth $omniauth, string $name): StrategyInterface
     {
-        if (!isset($this->strategies[$name])) {
+        if (!isset($this->strategyOptions[$name])) {
             throw new StrategyNotFoundException("Unknown strategy '$name");
         }
         $strategyClass = $this->getStrategyClass($name);
+        $strategy = $this->newStrategy($strategyClass);
+        $strategy->setName($name);
+        $strategy->setOptions($this->strategyOptions[$name]);
+        $strategy->setOmniauth($omniauth);
 
-        if (class_exists($strategyClass)) {
-            $strategy = $this->newStrategy($strategyClass);
-            $strategy->setName($name);
-            $strategy->setOptions($this->strategies[$name]);
-            $strategy->setOmniauth($this->omniauth);
-            return $strategy;
-        } else {
-            throw new \InvalidArgumentException("Strategy class $strategyClass for $name not found");
-        }
+        return $strategy;
     }
 
     /**
      * @param string $name
+     *
      * @return string
      */
-    protected function getStrategyClass($name)
+    protected function getStrategyClass($name): string
     {
-        $options = $this->strategies[$name];
+        $options = $this->strategyOptions[$name];
         if (isset($options['strategy_class'])) {
             $strategyClass = $options['strategy_class'];
             if (!class_exists($strategyClass)) {
@@ -81,17 +74,23 @@ class StrategyFactory implements StrategyFactoryInterface
         } elseif (isset($this->strategyClasses[$name])) {
             $strategyClass = $this->strategyClasses[$name];
         } else {
-            $strategyClass = Text::camelize($name) . 'Strategy';
+            $strategyClass = __NAMESPACE__.'\\strategy\\'.Text::camelize($name).'Strategy';
         }
+
+        if (!class_exists($strategyClass)) {
+            throw new \InvalidArgumentException("Strategy class $strategyClass for $name not found");
+        }
+
         return $strategyClass;
     }
 
     /**
      * @param string $strategyClass
+     *
      * @return StrategyInterface
      */
-    protected function newStrategy(string $strategyClass)
+    protected function newStrategy(string $strategyClass): StrategyInterface
     {
-        return $this->strategyInstantiator ? call_user_func($this->strategyInstantiator, $strategyClass) : new $strategyClass();
+        return isset($this->strategyInstantiator) ? call_user_func($this->strategyInstantiator, $strategyClass) : new $strategyClass();
     }
 }

@@ -1,6 +1,13 @@
 <?php
 
-namespace winwin\omniauth;
+declare(strict_types=1);
+
+namespace winwin\omniauth\strategy;
+
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
+use winwin\omniauth\exception\AuthFailException;
+use winwin\omniauth\exception\AuthParameterException;
 
 /**
  * Class ProviderStrategy.
@@ -16,7 +23,7 @@ namespace winwin\omniauth;
  */
 class ProviderStrategy extends AbstractStrategy
 {
-    const HMAC_SHA256 = 'hmac_sha256';
+    public const HMAC_SHA256 = 'hmac_sha256';
 
     protected $defaults = [
         'sign_type' => self::HMAC_SHA256,
@@ -24,21 +31,31 @@ class ProviderStrategy extends AbstractStrategy
         'transport_method' => 'GET',
     ];
 
-    public function authenticate()
+    public function authenticate(): ResponseInterface
     {
-        $authUrl = $this->options['provider'];
-        $authUrl .= (false === strpos($authUrl, '?') ? '?' : '&') . 'redirect_uri='
-            . urlencode($this->buildRedirectUri());
+        $authUrl = $this->options['provider'] ?? null;
+        if (!$authUrl) {
+            throw new \InvalidArgumentException(__CLASS__.' option provider is required');
+        }
+        $authUrl .= (false === strpos($authUrl, '?') ? '?' : '&').'redirect_uri='
+            .urlencode((string) $this->buildRedirectUri());
 
         return $this->redirect($authUrl);
     }
 
-    public function verify()
+    public function verify(): ResponseInterface
     {
         return $this->login($this->getIdentity());
     }
 
-    public function transport($redirectUrl, array $identity, $error = null)
+    /**
+     * @param string            $redirectUrl
+     * @param array             $identity
+     * @param string|array|null $error
+     *
+     * @return ResponseInterface
+     */
+    public function transport(string $redirectUrl, array $identity, $error = null): ResponseInterface
     {
         $data = [
             'timestamp' => date('c'),
@@ -51,43 +68,42 @@ class ProviderStrategy extends AbstractStrategy
         }
         $data['sign_type'] = $this->options['sign_type'];
         $data['sign'] = $this->sign($data);
-        if ('GET' == $this->options['transport_method']) {
-            return $this->redirect($redirectUrl . (false === strpos($redirectUrl, '?') ? '?' : '&') . 'auth=' . base64_encode(json_encode($data)));
-        } else {
-            $html = '<!doctype html><html lang="en"><body onload="postit();"><form name="auth" method="post" action="' . $redirectUrl . '">';
-            foreach ($data as $key => $value) {
-                $html .= '<input type="hidden" name="' . $key . '" value="' . htmlspecialchars($value) . '">';
-            }
-
-            $html .= '</form>';
-            $html .= '<script type="text/javascript">function postit(){ document.auth.submit(); }</script>';
-            $html .= '</body></html>';
-
-            return $this->getResponseFactory()->createResponse()
-                ->withBody($this->getStreamFactory()->createStream($html));
+        if ('GET' === $this->options['transport_method']) {
+            return $this->redirect($redirectUrl.(false === strpos($redirectUrl, '?') ? '?' : '&')
+                .'auth='.base64_encode(json_encode($data)));
         }
+
+        $html = '<!doctype html><html lang="en"><body onload="postit();">'
+            .'<form name="auth" method="post" action="'.$redirectUrl.'">';
+        foreach ($data as $key => $value) {
+            $html .= '<input type="hidden" name="'.$key.'" value="'.htmlspecialchars($value).'">';
+        }
+
+        $html .= '</form>';
+        $html .= '<script type="text/javascript">function postit(){ document.auth.submit(); }</script>';
+        $html .= '</body></html>';
+
+        return $this->getResponseFactory()->createResponse()
+            ->withBody($this->getStreamFactory()->createStream($html));
     }
 
-    /**
-     * @return \Psr\Http\Message\UriInterface
-     */
-    protected function buildRedirectUri()
+    protected function buildRedirectUri(): UriInterface
     {
-        return $this->request->getUri()->withPath($this->action('verify'))
+        return $this->getRequest()->getUri()->withPath($this->action('verify'))
             ->withQuery(http_build_query([
-                'redirect_uri' => $this->request->getUri()
+                'redirect_uri' => $this->getRequest()->getUri(),
             ]));
     }
 
-    private function getIdentity()
+    private function getIdentity(): array
     {
-        $request = $this->request;
-        if ('GET' == $this->options['transport_method']) {
+        $request = $this->getRequest();
+        if ('GET' === $this->options['transport_method']) {
             $params = $request->getQueryParams();
             if (!isset($params['auth'])) {
                 throw new AuthParameterException('auth parameter is missing');
             }
-            $data = json_decode(base64_decode($params['auth']), true);
+            $data = json_decode(base64_decode($params['auth'], true), true);
         } else {
             $data = $request->getParsedBody();
         }
@@ -97,7 +113,7 @@ class ProviderStrategy extends AbstractStrategy
             } elseif (isset($data['error']['code'], $data['error']['message'])) {
                 throw new AuthFailException($data['error']['message'], $data['error']['code']);
             } else {
-                throw new AuthParameterException("auth response is malformed");
+                throw new AuthParameterException('auth response is malformed');
             }
         }
         if (!isset($data['auth'])) {
@@ -109,7 +125,7 @@ class ProviderStrategy extends AbstractStrategy
         if (!isset($data['timestamp'])) {
             throw new AuthParameterException('timestamp is missing');
         }
-        if (strtotime($data['timestamp']) < strtotime('-' . $this->options['timeout'])) {
+        if (strtotime($data['timestamp']) < strtotime('-'.$this->options['timeout'])) {
             throw new AuthParameterException('auth response expired');
         }
         if (!$this->verifySignature($data)) {
@@ -119,43 +135,54 @@ class ProviderStrategy extends AbstractStrategy
         return json_decode($data['auth'], true);
     }
 
-    private function verifySignature(array $data)
+    private function verifySignature(array $data): bool
     {
-        $signType = isset($data['sign_type']) ? $data['sign_type'] : self::HMAC_SHA256;
+        $signType = $data['sign_type'] ?? self::HMAC_SHA256;
         $signature = $data['sign'];
         unset($data['sign']);
-        if ($signType == self::HMAC_SHA256) {
-            return $signature == $this->sign($data);
+        if (self::HMAC_SHA256 === $signType) {
+            return $signature === $this->sign($data);
         } else {
-            return openssl_verify($this->getSignContext($data), base64_decode($signature), $this->getRsaPublicKey(), OPENSSL_ALGO_SHA256);
+            return 1 === openssl_verify(
+                    $this->getSignContext($data),
+                    base64_decode($signature, true),
+                    $this->getRsaPublicKey(),
+                    OPENSSL_ALGO_SHA256
+                );
         }
     }
 
-    private function sign(array $data)
+    private function sign(array $data): string
     {
-        $signType = isset($data['sign_type']) ? $data['sign_type'] : self::HMAC_SHA256;
-        if ($signType == self::HMAC_SHA256) {
+        $signType = $data['sign_type'] ?? self::HMAC_SHA256;
+        if (self::HMAC_SHA256 === $signType) {
             if (!isset($this->options['key'])) {
-                throw new \InvalidArgumentException("provider security key is required");
+                throw new \InvalidArgumentException('provider security key is required');
             }
+
             return hash_hmac('sha256', $this->getSignContext($data), $this->options['key']);
         } else {
             openssl_sign($this->getSignContext($data), $sign, $this->getRsaPrivateKey(), OPENSSL_ALGO_SHA256);
+
             return base64_encode($sign);
         }
-
     }
 
     /**
      * @param array $data
+     *
      * @return string
      */
-    private function getSignContext(array $data)
+    private function getSignContext(array $data): string
     {
         ksort($data);
+
         return http_build_query($data);
     }
 
+    /**
+     * @return resource
+     */
     private function getRsaPublicKey()
     {
         if (isset($this->options['rsa_public_key']) && is_resource($this->options['rsa_public_key'])) {
@@ -164,23 +191,27 @@ class ProviderStrategy extends AbstractStrategy
         if (isset($this->options['rsa_public_key_path'])) {
             $content = file_get_contents($this->options['rsa_public_key_path']);
             if (!$content) {
-                throw new \RuntimeException("Cannot read rsa public key file " . $this->options['rsa_public_key_path']);
+                throw new \RuntimeException('Cannot read rsa public key file '.$this->options['rsa_public_key_path']);
             }
             $this->options['rsa_public_key'] = $content;
         } elseif (isset($this->options['rsa_public_key']) && is_string($this->options['rsa_public_key'])) {
-            $this->options['rsa_public_key'] = "-----BEGIN PUBLIC KEY-----\n" .
-                wordwrap($this->options['rsa_public_key'], 64, "\n", true) .
+            $this->options['rsa_public_key'] = "-----BEGIN PUBLIC KEY-----\n".
+                wordwrap($this->options['rsa_public_key'], 64, "\n", true).
                 "\n-----END PUBLIC KEY-----";
         } else {
-            throw new \InvalidArgumentException("provider rsa public key is required");
+            throw new \InvalidArgumentException('provider rsa public key is required');
         }
-        $pubKey = openssl_get_publickey($this->options['rsa_public_key']);
+        $pubKey = openssl_pkey_get_public($this->options['rsa_public_key']);
         if (!is_resource($pubKey)) {
-            throw new \InvalidArgumentException("provider rsa public key is invalid");
+            throw new \InvalidArgumentException('provider rsa public key is invalid');
         }
+
         return $this->options['rsa_public_key'] = $pubKey;
     }
 
+    /**
+     * @return resource
+     */
     private function getRsaPrivateKey()
     {
         if (isset($this->options['rsa_private_key']) && is_resource($this->options['rsa_private_key'])) {
@@ -189,20 +220,21 @@ class ProviderStrategy extends AbstractStrategy
         if (isset($this->options['rsa_private_key_path'])) {
             $content = file_get_contents($this->options['rsa_private_key_path']);
             if (!$content) {
-                throw new \RuntimeException("Cannot read rsa private key file " . $this->options['rsa_private_key_path']);
+                throw new \RuntimeException('Cannot read rsa private key file '.$this->options['rsa_private_key_path']);
             }
             $this->options['rsa_private_key'] = $content;
         } elseif (isset($this->options['rsa_private_key']) && is_string($this->options['rsa_private_key'])) {
-            $this->options['rsa_private_key'] =  "-----BEGIN RSA PRIVATE KEY-----\n".
+            $this->options['rsa_private_key'] = "-----BEGIN RSA PRIVATE KEY-----\n".
                 wordwrap($this->options['rsa_private_key'], 64, "\n", true).
                 "\n-----END RSA PRIVATE KEY-----";
         } else {
-            throw new \InvalidArgumentException("provider rsa private key is required");
+            throw new \InvalidArgumentException('provider rsa private key is required');
         }
-        $pubKey = openssl_get_privatekey($this->options['rsa_private_key']);
+        $pubKey = openssl_pkey_get_private($this->options['rsa_private_key']);
         if (!is_resource($pubKey)) {
-            throw new \InvalidArgumentException("provider rsa private key is invalid");
+            throw new \InvalidArgumentException('provider rsa private key is invalid');
         }
+
         return $this->options['rsa_private_key'] = $pubKey;
     }
 }

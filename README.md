@@ -13,7 +13,7 @@ The constructor of the `Omniauth` class has serval options to control its behavi
 
 use winwin\omniauth\Omniauth;
 
-$omniauth = new Omniauth([
+$omniauthFactory = new OmniauthFactory([
     'route' => '/auth/:strategy/:action',
     'strategies' => [
         'provider' => [
@@ -22,6 +22,8 @@ $omniauth = new Omniauth([
         ]
     ]
 ]);
+    
+$omniauth = $omniauthFactory->create($request);
 ```
 
 ### strategies
@@ -36,9 +38,8 @@ by call:
 ```php
 <?php
 
-$omniauth->getStrategyFactory()->register($strategyName, $strategyClass);
+$omniauthFactory->getStrategyFactory()->register($strategyName, $strategyClass);
 ```
-### default
 
 ### route
 
@@ -62,10 +63,6 @@ The key name to save current page before redirect user to login page in `$_SESSI
 omniauth will redirect user to the saved page.
 The default value is `login_redirect_uri`.
 
-### identity_transformer
-
-A function to transformer user identity before save to session.
-
 ## How to add my authentication strategy?
 
 Check out [PasswordStrategy](tests/strategies/PasswordStrategy.php) to see how to implements an new authentication strategy.
@@ -80,7 +77,7 @@ and the `verify` function will check user's credential and call `$this->login($u
 <?php
 
 if (!$omniauth->isAuthenticated()) {
-    $omniauth->getStrategy($strategyName)->authenticate();
+    $omniauth->createStrategy($strategyName)->authenticate();
 }
 
 if ($omniauth->isAuthenticated()) {
@@ -89,4 +86,8 @@ if ($omniauth->isAuthenticated()) {
 
 $omniauth->clear();
 ```
+### Try it out
 
+```bash
+php -S localhost:8080 -t examples
+```

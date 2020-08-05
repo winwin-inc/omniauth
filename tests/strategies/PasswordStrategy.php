@@ -1,6 +1,11 @@
 <?php
 
-use winwin\omniauth\AbstractStrategy;
+declare(strict_types=1);
+
+namespace winwin\omniauth\strategies;
+
+use Psr\Http\Message\ResponseInterface;
+use winwin\omniauth\strategy\AbstractStrategy;
 
 class PasswordStrategy extends AbstractStrategy
 {
@@ -9,7 +14,7 @@ class PasswordStrategy extends AbstractStrategy
      */
     private $users;
 
-    public function authenticate()
+    public function authenticate(): ResponseInterface
     {
         $content = <<<"EOF"
 <!doctype html>
@@ -34,24 +39,26 @@ class PasswordStrategy extends AbstractStrategy
   </body>
 </html>
 EOF;
+
         return $this->getResponseFactory()->createResponse()
             ->withBody($this->getStreamFactory()->createStream($content));
     }
 
-    public function verify()
+    public function verify(): ResponseInterface
     {
         $this->buildUsers();
-        $params = $this->request->getParsedBody();
+        $params = $this->getRequest()->getParsedBody();
         if (!$this->hasUser($params['username'])) {
             return $this->redirect($this->action());
         }
         if (!password_verify($params['password'], $this->getPasswordHash($params['username']))) {
             return $this->redirect($this->action());
         }
+
         return $this->login($this->getIdentity($params['username']));
     }
 
-    private function buildUsers()
+    private function buildUsers(): void
     {
         if (!isset($this->users)) {
             $this->users = [];
@@ -61,26 +68,28 @@ EOF;
         }
     }
 
-    private function hasUser($username)
+    private function hasUser($username): bool
     {
         return isset($this->users[$username]);
     }
 
-    private function getPasswordHash($username)
+    private function getPasswordHash($username): string
     {
         if (!isset($this->users[$username]['password'])) {
             throw new \InvalidArgumentException("User $username password not set");
         }
+
         return $this->users[$username]['password'];
     }
 
-    private function getIdentity($username)
+    private function getIdentity($username): array
     {
         if (!isset($this->users[$username])) {
             return [];
         }
         $user = $this->users[$username];
         unset($user['password']);
+
         return $user;
     }
 }

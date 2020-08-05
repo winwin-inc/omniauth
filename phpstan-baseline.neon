@@ -1,0 +1,12 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Variable method call on winwin\\\\omniauth\\\\strategy\\\\StrategyInterface\\.$#"
+			count: 1
+			path: src/Omniauth.php
+
+		-
+			message: "#^Casting to string something that's already string\\.$#"
+			count: 1
+			path: src/Omniauth.php
+

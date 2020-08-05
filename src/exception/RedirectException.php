@@ -1,10 +1,8 @@
 <?php
 
+declare(strict_types=1);
 
-namespace winwin\omniauth;
-
-
-use Throwable;
+namespace winwin\omniauth\exception;
 
 class RedirectException extends \LogicException
 {
@@ -13,10 +11,10 @@ class RedirectException extends \LogicException
      */
     private $url;
 
-    public function __construct($url)
+    public function __construct(string $url)
     {
         $this->url = $url;
-        parent::__construct("");
+        parent::__construct('');
     }
 
     /**

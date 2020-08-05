@@ -36,5 +36,10 @@
         "psr-4": {
             "winwin\\omniauth\\": "tests/"
         }
+    },
+    "extra": {
+        "kuiper": {
+            "configuration": ["winwin\\omniauth\\OmniauthConfiguration"]
+        }
     }
 }

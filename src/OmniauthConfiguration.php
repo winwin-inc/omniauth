@@ -55,7 +55,7 @@ class OmniauthConfiguration
 
     /**
      * @Bean()
-     * @Inject("strategies": "application.omniauth.strategies")
+     * @Inject({"strategies": "application.omniauth.strategies"})
      */
     public function strategyDetector(?array $strategies): StrategyDetectorInterface
     {

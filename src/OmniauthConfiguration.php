@@ -53,4 +53,12 @@ class OmniauthConfiguration
 
         return $omniauthFactory;
     }
+
+    /**
+     * @Bean()
+     */
+    public function sessionStorage(): StorageFactoryInterface
+    {
+        return new SessionStorageFactory();
+    }
 }

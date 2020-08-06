@@ -3,22 +3,13 @@
 declare(strict_types=1);
 
 use Dotenv\Dotenv;
-use kuiper\di\ContainerBuilder;
-use kuiper\di\PropertiesDefinitionSource;
-use function kuiper\helper\env;
-use kuiper\helper\Properties;
-use kuiper\helper\PropertyResolverInterface;
-use kuiper\web\http\DiactorosHttpMessageFactoryConfiguration;
-use kuiper\web\middleware\Session;
-use kuiper\web\session\PhpSessionFactory;
-use kuiper\web\WebConfiguration;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Slim\App;
+use Slim\Factory\AppFactory;
 use winwin\omniauth\IdentityTransformerInterface;
 use winwin\omniauth\OminauthMiddleware;
 use winwin\omniauth\Omniauth;
-use winwin\omniauth\OmniauthConfiguration;
+use winwin\omniauth\OmniauthFactory;
 use winwin\omniauth\strategies\PasswordStrategy;
 use winwin\omniauth\strategy\HybridOAuth2Strategy;
 
@@ -26,64 +17,50 @@ require __DIR__.'/../vendor/autoload.php';
 
 Dotenv::createImmutable(__DIR__)->safeLoad();
 
-$builder = new ContainerBuilder();
-$builder->addConfiguration(new OmniauthConfiguration());
-$builder->addConfiguration(new DiactorosHttpMessageFactoryConfiguration());
-$builder->addConfiguration(new WebConfiguration());
-$properties = Properties::create([
-    'application' => [
-        'omniauth' => [
-            'route' => '/auth/:strategy/:action',
-            'strategies' => [
-                'password' => [
-                    'strategy_class' => PasswordStrategy::class,
-                    'users' => [
-                        [
-                            'user_id' => 'admin',
-                            'display_name' => 'Administrator',
-                            'password' => '$2y$10$1xtzJNWlfv6l1PDyXwiXb.8lpU968CeSXV0p/uTvd6qaqMC2/4GXa',
-                        ],
-                    ],
-                ],
-                'git-hub' => [
-                    'strategy_class' => HybridOAuth2Strategy::class,
-                    'keys' => [
-                        'id' => env('GITHUB_APP_ID'),
-                        'secret' => env('GITHUB_APP_SECRET'),
-                    ],
-                ],
-                'provider' => [
-                    'provider' => '/auth/provider/provide',
-                    'key' => 'ahPho9eenaewaqu8oojiehoS3vah3lae',
+$factory = new OmniauthFactory([
+    'route' => '/auth/:strategy/:action',
+    'strategies' => [
+        'password' => [
+            'strategy_class' => PasswordStrategy::class,
+            'users' => [
+                [
+                    'user_id' => 'admin',
+                    'display_name' => 'Administrator',
+                    'password' => '$2y$10$1xtzJNWlfv6l1PDyXwiXb.8lpU968CeSXV0p/uTvd6qaqMC2/4GXa',  // password_hash('admin', PASSWORD_BCRYPT)
                 ],
             ],
         ],
+        'git-hub' => [
+            'strategy_class' => HybridOAuth2Strategy::class,
+            'keys' => [
+                'id' => $_ENV['GITHUB_APP_ID'] ?? null,
+                'secret' => $_ENV['GITHUB_APP_SECRET'] ?? null,
+            ],
+        ],
+        'provider' => [
+            'provider' => '/auth/provider/provide',
+            'key' => 'ahPho9eenaewaqu8oojiehoS3vah3lae',
+        ],
     ],
 ]);
-$builder->addDefinitions(new PropertiesDefinitionSource($properties));
-$builder->addDefinitions([
-    PropertyResolverInterface::class => $properties,
-    IdentityTransformerInterface::class => new class() implements IdentityTransformerInterface {
-        /**
-         * {@inheritdoc}
-         */
-        public function transform(array $identity, string $strategy)
-        {
-            if ('git-hub' === $strategy) {
-                return ['user_id' => $identity['identifier']] + $identity;
-            } else {
-                return $identity;
-            }
+$factory->setIdentityTransformer(new class() implements IdentityTransformerInterface {
+    /**
+     * {@inheritdoc}
+     */
+    public function transform(array $identity, string $strategy)
+    {
+        if ('git-hub' === $strategy) {
+            return ['user_id' => $identity['identifier']] + $identity;
+        } else {
+            return $identity;
         }
-    },
-]);
-$container = $builder->build();
+    }
+});
 
 HybridOAuth2Strategy::setUp();
 
-$app = $container->get(App::class);
-$app->add($container->get(OminauthMiddleware::class));
-$app->add(new Session(new PhpSessionFactory(['auto_start' => true])));
+$app = AppFactory::create();
+$app->add(new OminauthMiddleware($factory));
 
 $app->get('/logout', function (ServerRequestInterface $request, ResponseInterface $resp) {
     Omniauth::get($request)->clear();

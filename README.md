@@ -11,7 +11,7 @@ The constructor of the `Omniauth` class has serval options to control its behavi
 ```php
 <?php
 
-use winwin\omniauth\Omniauth;
+use winwin\omniauth\OmniauthFactory;
 
 $omniauthFactory = new OmniauthFactory([
     'route' => '/auth/:strategy/:action',
@@ -52,10 +52,13 @@ and the `:action` place holder will match nothing or any word.
 
 The key name to save user identity in `$_SESSION` array. The default value is `'auth'`
 
-### auto_login
+### allow_list
 
-If value is true, omniauth will check current user whether is logged in (by check `$_SESSION['auth']` is not empty),
-if not, it will redirect user to the default login page. The default value is `true`.
+A list of uri which can access by anonymous user.
+
+### allow_pattern
+
+A regexp to match uri which can access by anonymous user.
 
 ### redirect_uri_key
 

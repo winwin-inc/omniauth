@@ -22,11 +22,6 @@ class Config
     private $route;
 
     /**
-     * @var bool
-     */
-    private $autoLogin;
-
-    /**
      * @var string
      */
     private $callbackUrl;
@@ -35,6 +30,11 @@ class Config
      * @var string
      */
     private $routeRegex;
+
+    /**
+     * @var array
+     */
+    private $strategies;
 
     /**
      * @return string
@@ -85,22 +85,6 @@ class Config
     }
 
     /**
-     * @return bool
-     */
-    public function isAutoLogin(): bool
-    {
-        return $this->autoLogin;
-    }
-
-    /**
-     * @param bool $autoLogin
-     */
-    public function setAutoLogin(bool $autoLogin): void
-    {
-        $this->autoLogin = $autoLogin;
-    }
-
-    /**
      * @return string
      */
     public function getCallbackUrl(): string
@@ -139,5 +123,21 @@ class Config
         }
 
         return $this->routeRegex;
+    }
+
+    /**
+     * @return array
+     */
+    public function getStrategies(): array
+    {
+        return $this->strategies;
+    }
+
+    /**
+     * @param array $strategies
+     */
+    public function setStrategies(array $strategies): void
+    {
+        $this->strategies = $strategies;
     }
 }

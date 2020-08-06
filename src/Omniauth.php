@@ -62,11 +62,16 @@ class Omniauth
     private $identityTransformer;
 
     /**
+     * @var AuthorizeRequestMatcherInterface
+     */
+    private $authorizeRequestMatcher;
+
+    /**
      * @var array<string,StrategyInterface>
      */
     private $strategies;
 
-    public function __construct(ServerRequestInterface $request, Config $config, StorageInterface $storage, StrategyFactoryInterface $strategyFactory, ResponseFactoryInterface $responseFactory, StreamFactoryInterface $streamFactory, StrategyDetectorInterface $strategyDetector, IdentityTransformerInterface $identityTransformer)
+    public function __construct(ServerRequestInterface $request, Config $config, StorageInterface $storage, StrategyFactoryInterface $strategyFactory, ResponseFactoryInterface $responseFactory, StreamFactoryInterface $streamFactory, StrategyDetectorInterface $strategyDetector, IdentityTransformerInterface $identityTransformer, AuthorizeRequestMatcherInterface $authorizeRequestMatcher)
     {
         $this->request = $request;
         $this->config = $config;
@@ -76,6 +81,7 @@ class Omniauth
         $this->streamFactory = $streamFactory;
         $this->strategyDetector = $strategyDetector;
         $this->identityTransformer = $identityTransformer;
+        $this->authorizeRequestMatcher = $authorizeRequestMatcher;
     }
 
     public static function get(ServerRequestInterface $request): ?Omniauth
@@ -86,16 +92,23 @@ class Omniauth
     public function authenticate(): ?ResponseInterface
     {
         $matches = $this->match($this->request);
-        if (null === $matches) {
-            if ($this->config->isAutoLogin() && !$this->isAuthenticated()) {
-                return $this->responseFactory->createResponse(302)
-                    ->withHeader('location', $this->getDefaultAuthUrl());
+        if (null !== $matches) {
+            $response = $this->doAuthenticate($matches[1], $matches[2] ?? null);
+            if (null !== $response) {
+                return $response;
             }
-
-            return null;
-        } else {
-            return $this->doAuthenticate($matches[1], $matches[2] ?? null);
         }
+        if (!$this->isAuthenticated() && $this->isAuthorizeRequest()) {
+            return $this->responseFactory->createResponse(302)
+                ->withHeader('location', $this->getDefaultAuthUrl());
+        }
+
+        return null;
+    }
+
+    private function isAuthorizeRequest(): bool
+    {
+        return $this->authorizeRequestMatcher->match($this->request);
     }
 
     private function doAuthenticate(string $strategyName, ?string $action): ?ResponseInterface

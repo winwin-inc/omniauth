@@ -42,11 +42,16 @@ class OmniauthFactory
     private $strategyDetector;
 
     /**
-     * @var IdentityTransformerInterface|null
+     * @var IdentityTransformerInterface
      */
     private $identityTransformer;
 
-    public function __construct(Config $config, StrategyFactoryInterface $strategyFactory, StorageFactoryInterface $storageFactory, ResponseFactoryInterface $responseFactory, StreamFactoryInterface $streamFactory, StrategyDetectorInterface $strategyDetector, IdentityTransformerInterface $identityTransformer)
+    /**
+     * @var AuthorizeRequestMatcherInterface
+     */
+    private $authorizeRequestMatcher;
+
+    public function __construct(Config $config, StrategyFactoryInterface $strategyFactory, StorageFactoryInterface $storageFactory, ResponseFactoryInterface $responseFactory, StreamFactoryInterface $streamFactory, StrategyDetectorInterface $strategyDetector, IdentityTransformerInterface $identityTransformer, AuthorizeRequestMatcherInterface $authorizeRequestMatcher)
     {
         $this->config = $config;
         $this->storageFactory = $storageFactory;
@@ -55,6 +60,7 @@ class OmniauthFactory
         $this->streamFactory = $streamFactory;
         $this->strategyDetector = $strategyDetector;
         $this->identityTransformer = $identityTransformer;
+        $this->authorizeRequestMatcher = $authorizeRequestMatcher;
     }
 
     public function create(ServerRequestInterface $request): Omniauth
@@ -67,7 +73,8 @@ class OmniauthFactory
             $this->responseFactory,
             $this->streamFactory,
             $this->strategyDetector,
-            $this->identityTransformer
+            $this->identityTransformer,
+            $this->authorizeRequestMatcher
         );
     }
 }

@@ -183,8 +183,8 @@ class OmniauthFactory
     {
         if (null === $this->authorizeRequestMatcher) {
             return new AuthorizeRequestMatcher(
-                $this->options['allow-list'] ?? [],
-                $this->options['allow-pattern'] ?? $this->getConfig()->getRouteRegex()
+                $this->options['allow_list'] ?? [],
+                $this->options['allow_pattern'] ?? $this->getConfig()->getRouteRegex()
             );
         }
 

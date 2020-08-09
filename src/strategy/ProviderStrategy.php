@@ -33,14 +33,13 @@ class ProviderStrategy extends AbstractStrategy
 
     public function authenticate(): ResponseInterface
     {
+        /** @var string $authUrl */
         $authUrl = $this->options['provider'] ?? null;
         if (!$authUrl) {
             throw new \InvalidArgumentException(__CLASS__.' option provider is required');
         }
-        $authUrl .= (false === strpos($authUrl, '?') ? '?' : '&').'redirect_uri='
-            .urlencode((string) $this->buildRedirectUri());
 
-        return $this->redirect($authUrl);
+        return $this->redirect($this->buildProviderUrl($authUrl));
     }
 
     public function verify(): ResponseInterface
@@ -85,6 +84,12 @@ class ProviderStrategy extends AbstractStrategy
 
         return $this->getResponseFactory()->createResponse()
             ->withBody($this->getStreamFactory()->createStream($html));
+    }
+
+    protected function buildProviderUrl(string $baseUrl): string
+    {
+        return $baseUrl.(false === strpos($baseUrl, '?') ? '?' : '&')
+            .'redirect_uri='.urlencode((string) $this->buildRedirectUri());
     }
 
     protected function buildRedirectUri(): UriInterface

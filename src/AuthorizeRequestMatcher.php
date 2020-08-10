@@ -14,20 +14,20 @@ class AuthorizeRequestMatcher implements AuthorizeRequestMatcherInterface
     private $allowList;
 
     /**
-     * @var string|null
+     * @var string[]
      */
-    private $allowPattern;
+    private $allowPatterns;
 
     /**
      * AuthorizeRequestMatcher constructor.
      *
      * @param string[] $allowList
-     * @param string   $allowPattern
+     * @param string[] $allowPatterns
      */
-    public function __construct(array $allowList = [], ?string $allowPattern = null)
+    public function __construct(array $allowList = [], array $allowPatterns = [])
     {
         $this->allowList = $allowList;
-        $this->allowPattern = $allowPattern;
+        $this->allowPatterns = $allowPatterns;
     }
 
     /**
@@ -40,8 +40,12 @@ class AuthorizeRequestMatcher implements AuthorizeRequestMatcherInterface
             return false;
         }
 
-        if (null !== $this->allowPattern && preg_match($this->allowPattern, $path)) {
-            return false;
+        if (count($this->allowPatterns) > 0) {
+            foreach ($this->allowPatterns as $pattern) {
+                if (preg_match($pattern, $path)) {
+                    return false;
+                }
+            }
         }
 
         return true;

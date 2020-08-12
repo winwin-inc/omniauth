@@ -9,9 +9,9 @@ interface IdentityTransformerInterface
     /**
      * Transform identity.
      *
-     * @param array $identity
+     * @param mixed $identity
      *
      * @return mixed
      */
-    public function transform(array $identity, string $strategy);
+    public function transform($identity, string $strategy);
 }

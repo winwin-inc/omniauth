@@ -9,7 +9,7 @@ class DefaultIdentityTransformer implements IdentityTransformerInterface
     /**
      * {@inheritdoc}
      */
-    public function transform(array $identity, string $strategy)
+    public function transform($identity, string $strategy)
     {
         return $identity;
     }

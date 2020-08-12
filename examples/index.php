@@ -47,10 +47,11 @@ $factory->setIdentityTransformer(new class() implements IdentityTransformerInter
     /**
      * {@inheritdoc}
      */
-    public function transform(array $identity, string $strategy)
+    public function transform($identity, string $strategy)
     {
         if ('git-hub' === $strategy) {
-            return ['user_id' => $identity['identifier']] + $identity;
+            /* @var \Hybridauth\User\Profile $identity */
+            return ['user_id' => $identity->identifier] + get_object_vars($identity);
         } else {
             return $identity;
         }

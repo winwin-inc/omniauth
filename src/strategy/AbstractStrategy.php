@@ -112,7 +112,12 @@ abstract class AbstractStrategy implements StrategyInterface
         }
     }
 
-    public function login(array $identity): ResponseInterface
+    /**
+     * @param mixed $identity
+     *
+     * @return ResponseInterface
+     */
+    public function login($identity): ResponseInterface
     {
         $this->omniauth->setIdentity($identity, $this->name);
 

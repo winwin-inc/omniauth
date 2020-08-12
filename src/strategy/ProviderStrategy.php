@@ -33,9 +33,9 @@ class ProviderStrategy extends AbstractStrategy
 
     public function authenticate(): ResponseInterface
     {
-        /** @var string $authUrl */
+        /** @var string|null $authUrl */
         $authUrl = $this->options['provider'] ?? null;
-        if (!$authUrl) {
+        if (null === $authUrl || '' === $authUrl) {
             throw new \InvalidArgumentException(__CLASS__.' option provider is required');
         }
 

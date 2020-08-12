@@ -46,11 +46,7 @@ class HybridOAuth2Strategy extends AbstractStrategy
         try {
             $this->getHybridAuth()->authenticate();
 
-            return $this->login(array_filter(
-                get_object_vars($this->getHybridAuth()->getUserProfile()),
-                static function ($value): bool {
-                    return isset($value);
-                }));
+            return $this->login($this->getHybridAuth()->getUserProfile());
         } catch (RedirectException $e) {
             return $this->redirect($e->getUrl());
         } catch (StopException $e) {

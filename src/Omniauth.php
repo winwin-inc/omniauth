@@ -167,7 +167,11 @@ class Omniauth
         return $this->storage->get($this->config->getAuthKey());
     }
 
-    public function setIdentity(array $identity, string $strategyName): void
+    /**
+     * @param mixed  $identity
+     * @param string $strategyName
+     */
+    public function setIdentity($identity, string $strategyName): void
     {
         $this->storage->set($this->config->getAuthKey(), $this->identityTransformer->transform($identity, $strategyName));
         $this->storage->set(self::STRATEGY_KEY, $strategyName);

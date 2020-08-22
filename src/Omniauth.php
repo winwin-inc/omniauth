@@ -173,10 +173,11 @@ class Omniauth
      */
     public function setIdentity($identity, ?string $strategyName = null): void
     {
-        $this->storage->set($this->config->getAuthKey(), $this->identityTransformer->transform($identity, $strategyName));
         if (null !== $strategyName) {
+            $identity = $this->identityTransformer->transform($identity, $strategyName);
             $this->storage->set(self::STRATEGY_KEY, $strategyName);
         }
+        $this->storage->set($this->config->getAuthKey(), $identity);
     }
 
     public function buildUrl(string $strategy, string $action): string

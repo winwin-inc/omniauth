@@ -171,10 +171,12 @@ class Omniauth
      * @param mixed  $identity
      * @param string $strategyName
      */
-    public function setIdentity($identity, string $strategyName): void
+    public function setIdentity($identity, ?string $strategyName = null): void
     {
         $this->storage->set($this->config->getAuthKey(), $this->identityTransformer->transform($identity, $strategyName));
-        $this->storage->set(self::STRATEGY_KEY, $strategyName);
+        if (null !== $strategyName) {
+            $this->storage->set(self::STRATEGY_KEY, $strategyName);
+        }
     }
 
     public function buildUrl(string $strategy, string $action): string

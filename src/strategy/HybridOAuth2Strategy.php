@@ -11,7 +11,7 @@ use Hybridauth\Logger\LoggerInterface;
 use Psr\Http\Message\ResponseInterface;
 use winwin\omniauth\exception\RedirectException;
 use winwin\omniauth\exception\StopException;
-use winwin\omniauth\Text;
+use winwin\omniauth\StringUtil;
 
 class HybridOAuth2Strategy extends AbstractStrategy
 {
@@ -71,7 +71,7 @@ class HybridOAuth2Strategy extends AbstractStrategy
     public function getHybridAuth()
     {
         if (null === $this->hybridAuth) {
-            $providerClass = $this->options['provider_class'] ?? 'Hybridauth\\Provider\\'.Text::camelize($this->name);
+            $providerClass = $this->options['provider_class'] ?? 'Hybridauth\\Provider\\'.StringUtil::camelize($this->name);
             $options = $this->options + [
                     'callback' => $this->action('verify', true),
                 ];

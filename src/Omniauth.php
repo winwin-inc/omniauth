@@ -120,7 +120,7 @@ class Omniauth
 
             return null;
         }
-        if (Text::isEmpty($action) || '/' === $action) {
+        if (StringUtil::isEmpty($action) || '/' === $action) {
             $action = 'authenticate';
         } else {
             $action = trim($action, '/');
@@ -191,7 +191,7 @@ class Omniauth
     public function getCallbackUrl(): string
     {
         $redirect = $this->storage->get($this->config->getRedirectUriKey());
-        if (Text::isNotEmpty($redirect)) {
+        if (StringUtil::isNotEmpty($redirect)) {
             $this->storage->delete($this->config->getRedirectUriKey());
 
             return $redirect;
@@ -211,7 +211,7 @@ class Omniauth
             $redirectUri = $this->request->getUri();
         }
         if ($redirectUri instanceof UriInterface) {
-            $redirectUri = Text::isNotEmpty($redirectUri->getQuery())
+            $redirectUri = StringUtil::isNotEmpty($redirectUri->getQuery())
                 ? $redirectUri->getPath().'?'.$redirectUri->getQuery()
                 : $redirectUri->getPath();
         }

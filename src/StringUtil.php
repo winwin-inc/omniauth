@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace winwin\omniauth;
 
-final class Text
+final class StringUtil
 {
     public static function camelize(string $str, ?string $delimiter = null): string
     {

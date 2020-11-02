@@ -27,8 +27,8 @@ class StrategyFactory implements StrategyFactoryInterface
     /**
      * StrategyFactory constructor.
      *
-     * @param array    $strategyOptions
-     * @param callable $strategyInstantiator
+     * @param array         $strategyOptions
+     * @param callable|null $strategyInstantiator
      */
     public function __construct(array $strategyOptions, ?callable $strategyInstantiator = null)
     {
@@ -74,7 +74,7 @@ class StrategyFactory implements StrategyFactoryInterface
         } elseif (isset($this->strategyClasses[$name])) {
             $strategyClass = $this->strategyClasses[$name];
         } else {
-            $strategyClass = __NAMESPACE__.'\\strategy\\'.Text::camelize($name).'Strategy';
+            $strategyClass = __NAMESPACE__.'\\strategy\\'.StringUtil::camelize($name).'Strategy';
         }
 
         if (!class_exists($strategyClass)) {

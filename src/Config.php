@@ -53,17 +53,17 @@ class Config
     }
 
     /**
-     * @return string
+     * @return false|string
      */
-    public function getRedirectUriKey(): string
+    public function getRedirectUriKey()
     {
         return $this->redirectUriKey;
     }
 
     /**
-     * @param string $redirectUriKey
+     * @param false|string $redirectUriKey
      */
-    public function setRedirectUriKey(string $redirectUriKey): void
+    public function setRedirectUriKey($redirectUriKey): void
     {
         $this->redirectUriKey = $redirectUriKey;
     }

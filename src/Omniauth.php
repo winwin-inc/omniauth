@@ -116,7 +116,7 @@ class Omniauth
         try {
             $strategy = $this->createStrategy($strategyName);
         } catch (StrategyNotFoundException $e) {
-            var_export(['no strategy', $strategyName, $e->getMessage()]);
+            // var_export(['no strategy', $strategyName, $e->getMessage()]);
 
             return null;
         }
@@ -168,8 +168,8 @@ class Omniauth
     }
 
     /**
-     * @param mixed  $identity
-     * @param string $strategyName
+     * @param mixed       $identity
+     * @param string|null $strategyName
      */
     public function setIdentity($identity, ?string $strategyName = null): void
     {
@@ -190,11 +190,14 @@ class Omniauth
 
     public function getCallbackUrl(): string
     {
-        $redirect = $this->storage->get($this->config->getRedirectUriKey());
-        if (StringUtil::isNotEmpty($redirect)) {
-            $this->storage->delete($this->config->getRedirectUriKey());
+        $redirectUriSessionKey = $this->config->getRedirectUriKey();
+        if (false !== $redirectUriSessionKey) {
+            $redirect = $this->storage->get($redirectUriSessionKey);
+            if (StringUtil::isNotEmpty($redirect)) {
+                $this->storage->delete($redirectUriSessionKey);
 
-            return $redirect;
+                return $redirect;
+            }
         }
 
         return $this->config->getCallbackUrl();
@@ -207,15 +210,18 @@ class Omniauth
      */
     public function getDefaultAuthUrl($redirectUri = null): string
     {
-        if (null === $redirectUri) {
-            $redirectUri = $this->request->getUri();
+        $redirectUriSessionKey = $this->config->getRedirectUriKey();
+        if (false !== $redirectUriSessionKey) {
+            if (null === $redirectUri) {
+                $redirectUri = $this->request->getUri();
+            }
+            if ($redirectUri instanceof UriInterface) {
+                $redirectUri = StringUtil::isNotEmpty($redirectUri->getQuery())
+                    ? $redirectUri->getPath().'?'.$redirectUri->getQuery()
+                    : $redirectUri->getPath();
+            }
+            $this->storage->set($redirectUriSessionKey, (string) $redirectUri);
         }
-        if ($redirectUri instanceof UriInterface) {
-            $redirectUri = StringUtil::isNotEmpty($redirectUri->getQuery())
-                ? $redirectUri->getPath().'?'.$redirectUri->getQuery()
-                : $redirectUri->getPath();
-        }
-        $this->storage->set($this->config->getRedirectUriKey(), (string) $redirectUri);
 
         return $this->buildUrl($this->strategyDetector->detect($this->request), '');
     }

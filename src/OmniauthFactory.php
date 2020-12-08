@@ -77,11 +77,19 @@ class OmniauthFactory
             }
 
             $config = new Config();
-            $config->setAuthKey($options['auth_key'] ?? 'auth');
-            $config->setRoute($options['route'] ?? '/:strategy/:action');
+            if (isset($options['auth_key'])) {
+                $config->setAuthKey($options['auth_key']);
+            }
+            if (isset($options['route'])) {
+                $config->setRoute($options['route']);
+            }
             $config->buildRouteRegex(array_keys($strategyOptions));
-            $config->setRedirectUriKey($options['redirect_uri_key'] ?? 'login_redirect_uri');
-            $config->setCallbackUrl($options['callback_url'] ?? '/');
+            if (isset($options['redirect_uri_key'])) {
+                $config->setRedirectUriKey($options['redirect_uri_key']);
+            }
+            if (isset($options['callback_url'])) {
+                $config->setCallbackUrl($options['callback_url']);
+            }
             $config->setStrategies($strategyOptions);
 
             $this->config = $config;

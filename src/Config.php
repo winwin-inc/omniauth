@@ -9,22 +9,22 @@ class Config
     /**
      * @var string
      */
-    private $authKey;
+    private $authKey = 'auth';
+
+    /**
+     * @var string|false
+     */
+    private $redirectUriKey = 'login_redirect_uri';
 
     /**
      * @var string
      */
-    private $redirectUriKey;
+    private $route = '/:strategy/:action';
 
     /**
      * @var string
      */
-    private $route;
-
-    /**
-     * @var string
-     */
-    private $callbackUrl;
+    private $callbackUrl = '/';
 
     /**
      * @var string
@@ -34,7 +34,7 @@ class Config
     /**
      * @var array
      */
-    private $strategies;
+    private $strategies = [];
 
     /**
      * @return string

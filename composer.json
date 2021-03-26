@@ -1,5 +1,7 @@
 {
     "name": "winwin/omniauth",
+    "description": "multi-provider authentication middleware",
+    "license": "MIT",
     "type": "project",
     "minimum-stability": "dev",
     "prefer-stable": true,
@@ -12,6 +14,7 @@
         "psr/http-factory": "^1.0"
     },
     "require-dev": {
+        "roave/security-advisories": "dev-master",
         "phpstan/extension-installer": "^1.0",
         "phpstan/phpstan": "^0.12.34",
         "phpstan/phpstan-strict-rules": "^0.12.4",
@@ -21,7 +24,7 @@
         "psr/container": "^1.0",
         "laminas/laminas-diactoros": "^2.0",
         "winwin/composer-phpcs-plugin": "^0.2",
-        "kuiper/kuiper": "^0.5.12",
+        "kuiper/kuiper": "^0.5",
         "slim/slim": "^4.5"
     },
     "suggest": {
@@ -36,6 +39,10 @@
         "psr-4": {
             "winwin\\omniauth\\": "tests/"
         }
+    },
+    "scripts": {
+        "test": "./vendor/bin/phpunit tests",
+        "lint": "./vendor/bin/phpstan analyze --error-format=raw"
     },
     "extra": {
         "kuiper": {

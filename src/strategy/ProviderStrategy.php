@@ -108,7 +108,8 @@ class ProviderStrategy extends AbstractStrategy
             if (!isset($params['auth'])) {
                 throw new AuthParameterException('auth parameter is missing');
             }
-            $data = json_decode(base64_decode($params['auth'], true), true);
+            $auth = str_replace(" ","+", $params['auth']);
+            $data = json_decode(base64_decode($auth, true), true);
         } else {
             $data = $request->getParsedBody();
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace winwin\omniauth;
 
+use Psr\Http\Message\MessageInterface;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -99,8 +100,12 @@ class Omniauth
             }
         }
         if (!$this->isAuthenticated() && $this->isAuthorizeRequest()) {
-            return $this->responseFactory->createResponse(302)
-                ->withHeader('location', $this->getDefaultAuthUrl());
+            if ($this->isAjax($this->request)) {
+                return $this->responseFactory->createResponse(401);
+            } else {
+                return $this->responseFactory->createResponse(302)
+                    ->withHeader('location', $this->getDefaultAuthUrl());
+            }
         }
 
         return null;
@@ -299,5 +304,10 @@ class Omniauth
     public function getRequest(): ServerRequestInterface
     {
         return $this->request;
+    }
+
+    private function isAjax(MessageInterface $message): bool
+    {
+        return false !== stripos($message->getHeaderLine('content-type'), 'application/json');
     }
 }

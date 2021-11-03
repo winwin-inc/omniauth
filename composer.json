@@ -6,7 +6,7 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
-        "php": "^7.2",
+        "php": ">=7.2",
         "ext-json": "*",
         "ext-openssl": "*",
         "psr/log": "^1.0",
@@ -24,7 +24,7 @@
         "psr/container": "^1.0",
         "laminas/laminas-diactoros": "^2.0",
         "winwin/composer-phpcs-plugin": "^0.2",
-        "kuiper/kuiper": "^0.5",
+        "kuiper/web": "^0.6",
         "slim/slim": "^4.5"
     },
     "suggest": {

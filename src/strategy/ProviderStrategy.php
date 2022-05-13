@@ -108,7 +108,7 @@ class ProviderStrategy extends AbstractStrategy
             if (!isset($params['auth'])) {
                 throw new AuthParameterException('auth parameter is missing');
             }
-            $auth = str_replace(" ","+", $params['auth']);
+            $auth = str_replace(' ', '+', $params['auth']);
             $data = json_decode(base64_decode($auth, true), true);
         } else {
             $data = $request->getParsedBody();
@@ -187,7 +187,7 @@ class ProviderStrategy extends AbstractStrategy
     }
 
     /**
-     * @return resource
+     * @return \OpenSSLAsymmetricKey|resource
      */
     private function getRsaPublicKey()
     {
@@ -208,7 +208,7 @@ class ProviderStrategy extends AbstractStrategy
             throw new \InvalidArgumentException('provider rsa public key is required');
         }
         $pubKey = openssl_pkey_get_public($this->options['rsa_public_key']);
-        if (!is_resource($pubKey)) {
+        if (false === $pubKey) {
             throw new \InvalidArgumentException('provider rsa public key is invalid');
         }
 
@@ -216,7 +216,7 @@ class ProviderStrategy extends AbstractStrategy
     }
 
     /**
-     * @return resource
+     * @return \OpenSSLAsymmetricKey|resource
      */
     private function getRsaPrivateKey()
     {
@@ -237,7 +237,7 @@ class ProviderStrategy extends AbstractStrategy
             throw new \InvalidArgumentException('provider rsa private key is required');
         }
         $pubKey = openssl_pkey_get_private($this->options['rsa_private_key']);
-        if (!is_resource($pubKey)) {
+        if (false === $pubKey) {
             throw new \InvalidArgumentException('provider rsa private key is invalid');
         }
 

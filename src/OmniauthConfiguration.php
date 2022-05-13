@@ -4,26 +4,23 @@ declare(strict_types=1);
 
 namespace winwin\omniauth;
 
-use DI\Annotation\Inject;
-use kuiper\di\annotation\Bean;
-use kuiper\di\annotation\ConditionalOnProperty;
-use kuiper\di\annotation\Configuration;
+use DI\Attribute\Inject;
+use kuiper\di\attribute\Bean;
+use kuiper\di\attribute\ConditionalOnProperty;
+use kuiper\di\attribute\Configuration;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use winwin\omniauth\strategy\StrategyDetectorInterface;
 
-/**
- * @Configuration()
- * @ConditionalOnProperty("application.omniauth")
- */
+#[Configuration]
+#[ConditionalOnProperty('application.omniauth')]
 class OmniauthConfiguration
 {
-    /**
-     * @Bean()
-     * @Inject({"options": "application.omniauth"})
-     */
-    public function omniauthFactory(array $options, ContainerInterface $container): OmniauthFactory
+    #[Bean]
+    public function omniauthFactory(
+        #[Inject('application.omniauth')] array $options,
+        ContainerInterface $container): OmniauthFactory
     {
         $omniauthFactory = new OmniauthFactory($options);
         if ($container->has(StrategyFactoryInterface::class)) {
@@ -54,9 +51,7 @@ class OmniauthConfiguration
         return $omniauthFactory;
     }
 
-    /**
-     * @Bean()
-     */
+    #[Bean]
     public function sessionStorage(): StorageFactoryInterface
     {
         return new SessionStorageFactory();

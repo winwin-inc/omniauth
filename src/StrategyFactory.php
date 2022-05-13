@@ -20,7 +20,7 @@ class StrategyFactory implements StrategyFactoryInterface
     private $strategyClasses;
 
     /**
-     * @var callable
+     * @var callable|null
      */
     private $strategyInstantiator;
 
